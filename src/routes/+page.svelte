@@ -9,7 +9,8 @@
 	/** Our API endpoints answer either the payload or `{ error }`. */
 	type ApiResponse<T> = Partial<T> & { error?: string };
 
-	const TILE = { width: 66, height: 44, gapX: 4, gapY: 8 };
+	// Tiles show the PC's ID (at most 3 digits), so they can stay small with large text.
+	const TILE = { width: 46, height: 40, gapX: 4, gapY: 8 };
 	const PADDING = 16;
 	/** Shrink a wide room to fit its card, but not so far that PC names become unreadable. */
 	const MIN_ZOOM = 0.75;
@@ -324,7 +325,7 @@
 		onclick={() => toggle(id)}
 	>
 		<span class="screen" aria-hidden="true"></span>
-		<span class="seat-name">{nameOf(id)}</span>
+		<span class="seat-name">{id}</span>
 	</button>
 {/snippet}
 
@@ -501,7 +502,7 @@
 	}
 
 	.map .seat-name {
-		font-size: 0.74rem;
+		font-size: 0.9rem;
 		letter-spacing: 0;
 	}
 
