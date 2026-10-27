@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { SvelteSet } from 'svelte/reactivity';
 	import { describeLocal } from '#lib/time.js';
-	import { fitScale } from '#lib/seatmap.js';
+	import { placeSeats } from '#lib/seatmap.js';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -42,13 +42,13 @@
 	const map = $derived.by(() => {
 		const raw = data.seats.filter((s) => s.layoutId === activeLayoutId);
 		if (raw.length === 0) return { seats: [], width: 0, height: 0 };
-		const minX = Math.min(...raw.map((s) => s.x));
-		const minY = Math.min(...raw.map((s) => s.y));
-		const { sx, sy } = fitScale(raw, TILE);
-		const seats = raw.map((s) => ({
+		const placed = placeSeats(raw, TILE);
+		const minX = Math.min(...placed.map((p) => p.x));
+		const minY = Math.min(...placed.map((p) => p.y));
+		const seats = raw.map((s, i) => ({
 			id: s.computerId,
-			left: Math.round((s.x - minX) * sx) + PADDING,
-			top: Math.round((s.y - minY) * sy) + PADDING
+			left: Math.round(placed[i].x - minX) + PADDING,
+			top: Math.round(placed[i].y - minY) + PADDING
 		}));
 		return {
 			seats,
