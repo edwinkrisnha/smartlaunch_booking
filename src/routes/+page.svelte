@@ -241,8 +241,9 @@
 
 			<div class="floor" aria-busy={checking} bind:clientWidth={floorWidth}>
 				{#if map.seats.length > 0}
-					<!-- Outer box takes the zoomed size so the floor scrolls exactly as far as needed. -->
-					<div style:width="{map.width * zoom}px" style:height="{map.height * zoom}px">
+					<!-- Outer box takes the zoomed size so the floor scrolls exactly as far as needed;
+					     auto margins centre it when it is narrower than the floor. -->
+					<div class="map-box" style:width="{map.width * zoom}px" style:height="{map.height * zoom}px">
 						<div
 							class="map"
 							style:width="{map.width}px"
@@ -358,6 +359,11 @@
 		width: 100%;
 		max-width: 1168px;
 		margin-inline: auto;
+	}
+
+	/* The picker goes wider than the column, but keeps a margin from the screen edges. */
+	.picker {
+		margin-inline: clamp(0px, 3vw, 48px);
 	}
 
 	.intro {
@@ -503,6 +509,10 @@
 		background-image: radial-gradient(var(--grid-dot) 1.2px, transparent 1.2px);
 		background-size: 18px 18px;
 		transition: opacity 0.2s;
+	}
+
+	.map-box {
+		margin-inline: auto;
 	}
 
 	.floor[aria-busy='true'] {
