@@ -13,6 +13,7 @@
 	<title>Book a PC · {PUBLIC_CENTER_NAME}</title>
 </svelte:head>
 
+<div class="app">
 <header>
 	{#if data.user}
 		<form class="strip" method="POST" action="/logout">
@@ -31,10 +32,15 @@
 	</div>
 </header>
 
-<!-- The booking page lets its PC map use the full screen width and centres its other sections itself. -->
-<main class:wide={page.url.pathname === '/'}>
+<!-- The booking page lets its PC map use the full screen width and centres its other sections itself;
+     the login and sign-up pages are centred vertically in the space below the header. -->
+<main
+	class:wide={page.url.pathname === '/'}
+	class:centered={page.url.pathname === '/login' || page.url.pathname === '/signup'}
+>
 	{@render children()}
 </main>
+</div>
 
 <style>
 	/* Header band; --header-cut gives it an angled lower edge. */
@@ -150,7 +156,17 @@
 		border-bottom-color: var(--nav-underline);
 	}
 
+	/* Header on top, main filling the rest of the screen. */
+	.app {
+		display: flex;
+		flex-direction: column;
+		min-height: 100vh;
+		min-height: 100dvh;
+	}
+
 	main {
+		flex: 1 0 auto;
+		width: 100%;
 		max-width: 1200px;
 		margin: 0 auto;
 		padding: 2.5rem 1rem 4rem;
@@ -158,6 +174,12 @@
 
 	main.wide {
 		max-width: none;
+	}
+
+	main.centered {
+		display: grid;
+		align-content: center;
+		padding-block: 2.5rem;
 	}
 
 	@media (max-width: 640px) {

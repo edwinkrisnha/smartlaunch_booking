@@ -86,16 +86,15 @@
 		display: grid;
 		grid-template-columns: 1fr minmax(0, 560px);
 		gap: 3rem;
-		align-items: start;
+		align-items: center;
+		width: 100%;
 		max-width: 1080px;
-		margin: 3rem auto;
+		margin: 0 auto;
 	}
 
 	.intro {
 		display: grid;
 		gap: 0.8rem;
-		position: sticky;
-		top: 2rem;
 	}
 
 	.intro .muted {
@@ -162,11 +161,6 @@
 		.signup {
 			grid-template-columns: 1fr;
 			gap: 1.75rem;
-			margin: 1rem auto;
-		}
-
-		.intro {
-			position: static;
 		}
 	}
 

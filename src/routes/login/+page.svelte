@@ -53,8 +53,9 @@
 		grid-template-columns: 1fr minmax(0, 400px);
 		gap: 3rem;
 		align-items: center;
+		width: 100%;
 		max-width: 900px;
-		margin: 3rem auto;
+		margin: 0 auto;
 	}
 
 	.intro {
@@ -92,7 +93,7 @@
 		.login {
 			grid-template-columns: 1fr;
 			gap: 1.75rem;
-			margin: 1rem auto;
+			margin: 0 auto;
 		}
 	}
 </style>
