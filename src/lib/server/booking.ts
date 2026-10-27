@@ -40,6 +40,8 @@ export interface SignupInput {
 	mobilePhone: string;
 	firstName: string;
 	lastName: string;
+	/** Optional street address. */
+	address: string;
 	/** `YYYY-MM-DD` */
 	birthday: string;
 }
@@ -69,8 +71,11 @@ export function validateSignup(input: SignupInput): SignupErrors {
 	if (!PHONE_RE.test(input.mobilePhone)) {
 		errors.mobilePhone = 'Enter a valid mobile number, e.g. +62 812 3456 7890.';
 	}
-	if (input.firstName.length > 50) errors.firstName = 'At most 50 characters.';
-	if (input.lastName.length > 50) errors.lastName = 'At most 50 characters.';
+	if (!input.firstName.trim()) errors.firstName = 'Enter your first name.';
+	else if (input.firstName.length > 50) errors.firstName = 'At most 50 characters.';
+	if (!input.lastName.trim()) errors.lastName = 'Enter your last name.';
+	else if (input.lastName.length > 50) errors.lastName = 'At most 50 characters.';
+	if (input.address.length > 100) errors.address = 'At most 100 characters.';
 
 	const born = parseLocal(`${input.birthday}T00:00`);
 	const now = new Date();
@@ -103,7 +108,7 @@ export async function signup(input: SignupInput): Promise<SessionUser> {
 		FirstName: sqlText(input.firstName.trim(), 50),
 		LastName: sqlText(input.lastName.trim(), 50),
 		Birthday: parseLocal(`${input.birthday}T00:00`)!,
-		Address: '',
+		Address: sqlText(input.address.trim(), 100),
 		City: '',
 		Zip: '',
 		State: '',

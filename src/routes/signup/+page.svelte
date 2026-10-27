@@ -67,11 +67,12 @@
 			)}
 			{@render field('password', 'Password', { type: 'password', autocomplete: 'new-password', required: true, maxlength: 64 }, 'At least 6 characters.')}
 			{@render field('confirm', 'Confirm password', { type: 'password', autocomplete: 'new-password', required: true, maxlength: 64 })}
-			{@render field('firstName', 'First name (optional)', { autocomplete: 'given-name', maxlength: 50 })}
-			{@render field('lastName', 'Last name (optional)', { autocomplete: 'family-name', maxlength: 50 })}
+			{@render field('firstName', 'First name', { autocomplete: 'given-name', required: true, maxlength: 50 })}
+			{@render field('lastName', 'Last name', { autocomplete: 'family-name', required: true, maxlength: 50 })}
 			{@render field('email', 'Email', { type: 'email', autocomplete: 'email', required: true, maxlength: 100 })}
 			{@render field('mobilePhone', 'Mobile phone', { type: 'tel', autocomplete: 'tel', required: true, maxlength: 20 })}
 			{@render field('birthday', 'Date of birth', { type: 'date', autocomplete: 'bday', required: true, max: today })}
+			{@render field('address', 'Address (optional)', { autocomplete: 'street-address', maxlength: 100, wide: true })}
 		</div>
 
 		<button class="primary" type="submit" disabled={submitting}>
