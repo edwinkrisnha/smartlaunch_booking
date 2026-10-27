@@ -1,18 +1,22 @@
 <script lang="ts">
+	import { INTL_LOCALES, translator } from '#lib/i18n/index.js';
 	import { parseLocal } from '#lib/time.js';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
 
+	const t = $derived(translator(data.locale));
 	const pcNames = $derived(new Map(data.pcs.map((pc) => [pc.id, pc.name || `PC ${pc.id}`])));
 
-	const dateFormat = new Intl.DateTimeFormat(undefined, {
-		timeZone: 'UTC',
-		weekday: 'short',
-		day: 'numeric',
-		month: 'short',
-		year: 'numeric'
-	});
+	const dateFormat = $derived(
+		new Intl.DateTimeFormat(INTL_LOCALES[data.locale], {
+			timeZone: 'UTC',
+			weekday: 'short',
+			day: 'numeric',
+			month: 'short',
+			year: 'numeric'
+		})
+	);
 
 	/** Booking times are center wall-clock values, so format them in UTC to avoid any shift. */
 	function dateOf(value: string): string {
@@ -29,8 +33,8 @@
 </script>
 
 <section class="intro">
-	<p class="eyebrow">Your account</p>
-	<h1>My bookings</h1>
+	<p class="eyebrow">{t('bookings.eyebrow')}</p>
+	<h1>{t('bookings.title')}</h1>
 	<div class="hazard" aria-hidden="true"></div>
 </section>
 
@@ -38,8 +42,8 @@
 	<p class="notice error" role="alert">{data.loadError}</p>
 {:else if data.bookings.length === 0}
 	<section class="card empty">
-		<p>You have no upcoming bookings.</p>
-		<a class="cta" href="/">Book a PC</a>
+		<p>{t('bookings.empty')}</p>
+		<a class="cta" href="/">{t('bookings.cta')}</a>
 	</section>
 {:else}
 	<ul class="bookings">
@@ -50,11 +54,11 @@
 					<span class="date">{dateOf(booking.start)}</span>
 				</div>
 				<dl>
-					<dt>Duration</dt>
-					<dd>{duration(booking.start, booking.end)}, until {booking.end.slice(11)}</dd>
-					<dt>PCs</dt>
+					<dt>{t('bookings.duration')}</dt>
+					<dd>{t('bookings.until', { duration: duration(booking.start, booking.end), time: booking.end.slice(11) })}</dd>
+					<dt>{t('bookings.pcs')}</dt>
 					<dd>{booking.computerIds.map((id) => pcNames.get(id) ?? `PC ${id}`).join(', ')}</dd>
-					<dt>Booking</dt>
+					<dt>{t('bookings.booking')}</dt>
 					<dd class="muted">#{booking.bookingId}</dd>
 				</dl>
 			</li>

@@ -24,7 +24,7 @@ The REST API is protected by one shared Basic-auth credential, so the browser ne
 | `GET /api/bookings` | `GET /bookings`, filtered to the logged-in customer |
 | `POST /api/bookings` `{start, minutes, computerIds, orderCode?}` | `POST /bookings` |
 
-The pages are `/login`, `/signup` (create an account), `/` (book) and `/bookings` (my bookings).
+The pages are `/login`, `/signup` (create an account), `/` (book) and `/bookings` (my bookings). The flags in the header post to `/lang` to switch language.
 
 ### Things worth knowing
 
@@ -34,6 +34,14 @@ The pages are `/login`, `/signup` (create an account), `/` (book) and `/bookings
 - **Sign-up.** New accounts go into the server's "members" group (or its first group). The API has no "unspecified" gender, so accounts are stored with the server's default, female, as the MVC client also does. First name, last name and date of birth are required (the birthday so age limits on apps keep working); the address is optional. The server may refuse a username through its profanity filter; the app then asks for another one.
 - **Duplicate protection.** Each confirm sends an `OrderCode`; the server ignores a second booking with the same code.
 - **Payments are out of scope.** Unlike the MVC client's flow, which goes through the payment providers and the Azure DB, this app writes the booking straight to the center server.
+
+## Languages
+
+The site is available in English, German and Danish. Visitors switch with the flags in the header; the choice is kept in a `lang` cookie for a year. Without that cookie the site follows the browser's preferred languages, then `DEFAULT_LANGUAGE`, then English.
+
+Error messages from the app's API (`/api/*`) come back in the same language.
+
+All text lives in `src/lib/i18n/`: `en.ts` is the reference, and `de.ts` and `da.ts` must define every key it has (the type check fails otherwise). To add a language, add a file such as `fr.ts`, then register it in `LOCALES`, `LANGUAGE_NAMES`, `INTL_LOCALES` and the dictionaries in `src/lib/i18n/index.ts`, and give it a flag in `src/routes/+layout.svelte`.
 
 ## Themes
 
@@ -91,6 +99,7 @@ The `esportsnord` theme uses Unbounded as a free stand-in for INTEGRAL CF. To us
 | `SL_LICENSE_EMAIL` | no | Optional; adds `?licenseemail=` for relay setups |
 | `PUBLIC_CENTER_NAME` | no | Name shown in the header |
 | `PUBLIC_ALLOW_SIGNUP` | no | `false` hides `/signup` and turns off `/api/signup`; on by default |
+| `DEFAULT_LANGUAGE` | no | `en`, `de` or `da`, for visitors whose browser asks for none of them; defaults to `en` (see [Languages](#languages)) |
 | `THEME` | no | Theme folder under `src/themes`; defaults to `default` (see [Themes](#themes)) |
 
 ### Reaching the center server from Cloudflare

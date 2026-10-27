@@ -7,7 +7,7 @@ import type { RequestHandler } from './$types';
 export const POST: RequestHandler = endpoint(async ({ request, cookies }) => {
 	const body = (await readJson(request)) as { username?: unknown; password?: unknown };
 	const user = await login(String(body.username ?? ''), String(body.password ?? ''));
-	if (!user) throw new BookingError('Incorrect username or password.', 401);
+	if (!user) throw new BookingError('login.incorrect', 401);
 
 	await createSession(cookies, user);
 	return { user };

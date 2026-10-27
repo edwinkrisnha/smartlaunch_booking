@@ -6,6 +6,6 @@ export const load: PageServerLoad = async ({ locals }) => {
 		const [bookings, pcs] = await Promise.all([listBookings(locals.user!.username), listPcs()]);
 		return { bookings, pcs, loadError: null };
 	} catch (err) {
-		return { bookings: [], pcs: [], loadError: toHttpError(err).message };
+		return { bookings: [], pcs: [], loadError: toHttpError(err, locals.locale).message };
 	}
 };

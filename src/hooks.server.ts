@@ -1,22 +1,34 @@
 import { json, redirect } from '@sveltejs/kit';
 import type { Handle } from '@sveltejs/kit/hooks';
+import { DEFAULT_LANGUAGE } from '$app/env/private';
+import { fromAcceptLanguage, isLocale, LOCALE_COOKIE, translate } from '#lib/i18n/index.js';
 import { readSession } from '#lib/server/session.js';
 
-const PUBLIC_PATHS = new Set(['/login', '/api/login', '/signup', '/api/signup']);
+const PUBLIC_PATHS = new Set(['/login', '/api/login', '/signup', '/api/signup', '/lang']);
+const FALLBACK_LOCALE = isLocale(DEFAULT_LANGUAGE) ? DEFAULT_LANGUAGE : 'en';
 
 export const handle: Handle = async ({ event, resolve }) => {
 	event.locals.user = await readSession(event.cookies);
 
+	// The visitor's pick from the language switcher, else their browser's language.
+	const chosen = event.cookies.get(LOCALE_COOKIE);
+	const locale = isLocale(chosen)
+		? chosen
+		: (fromAcceptLanguage(event.request.headers.get('accept-language')) ?? FALLBACK_LOCALE);
+	event.locals.locale = locale;
+
 	const { pathname } = event.url;
 	if (!event.locals.user && !PUBLIC_PATHS.has(pathname)) {
 		if (pathname.startsWith('/api/')) {
-			return json({ error: 'Not logged in.' }, { status: 401 });
+			return json({ error: translate(locale, 'error.notLoggedIn') }, { status: 401 });
 		}
 		const next = pathname === '/' ? '' : `?next=${encodeURIComponent(pathname + event.url.search)}`;
 		redirect(303, `/login${next}`);
 	}
 
-	const response = await resolve(event);
+	const response = await resolve(event, {
+		transformPageChunk: ({ html }) => html.replace('%lang%', locale)
+	});
 	response.headers.set('X-Frame-Options', 'DENY');
 	response.headers.set('Referrer-Policy', 'same-origin');
 	return response;

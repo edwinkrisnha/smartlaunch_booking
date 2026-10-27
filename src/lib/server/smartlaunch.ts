@@ -4,13 +4,11 @@
 // credential that must never reach the browser.
 
 import { SL_API_URL, SL_API_USERNAME, SL_API_PASSWORD, SL_LICENSE_EMAIL } from '$app/env/private';
+import { LocalizedError, type MessageKey } from '#lib/i18n/index.js';
 
-export class SmartlaunchError extends Error {
-	constructor(
-		message: string,
-		readonly status = 502
-	) {
-		super(message);
+export class SmartlaunchError extends LocalizedError {
+	constructor(key: MessageKey, status = 502) {
+		super(key, status);
 	}
 }
 
@@ -90,7 +88,10 @@ function authHeader(): string {
 }
 
 function buildUrl(path: string, query: Record<string, string> = {}): string {
-	if (!SL_API_URL) throw new SmartlaunchError('SL_API_URL is not configured', 500);
+	if (!SL_API_URL) {
+		console.error('SL_API_URL is not configured');
+		throw new SmartlaunchError('error.notConfigured', 500);
+	}
 	const url = new URL(SL_API_URL + path);
 	for (const [key, value] of Object.entries(query)) url.searchParams.set(key, value);
 	if (SL_LICENSE_EMAIL) url.searchParams.set('licenseemail', SL_LICENSE_EMAIL);
@@ -117,7 +118,7 @@ async function request<T>(
 	} catch (err) {
 		if (err instanceof SmartlaunchError) throw err;
 		console.error(`Smartlaunch ${method} ${path} failed`, err);
-		throw new SmartlaunchError('The center server could not be reached. Please try again later.');
+		throw new SmartlaunchError('error.unreachable');
 	}
 
 	const text = await res.text();
@@ -128,20 +129,20 @@ async function request<T>(
 			? 'SL_API_URL is an IP address, which Cloudflare blocks (error 1003). Use a hostname, e.g. a Cloudflare Tunnel.'
 			: `API credentials rejected (${res.status}); check SL_API_USERNAME / SL_API_PASSWORD.`;
 		console.error(`Smartlaunch ${method} ${path}: ${reason}`);
-		throw new SmartlaunchError('The booking service is misconfigured. Please contact the center.');
+		throw new SmartlaunchError('error.misconfigured');
 	}
 
 	if (res.status === 404 && notFoundAsNull) return null as T;
 	if (!res.ok) {
 		console.error(`Smartlaunch ${method} ${path}: HTTP ${res.status}`, text.slice(0, 500));
-		throw new SmartlaunchError('The center server returned an error. Please try again later.');
+		throw new SmartlaunchError('error.serverError');
 	}
 
 	try {
 		return (text ? JSON.parse(text) : null) as T;
 	} catch {
 		console.error(`Smartlaunch ${method} ${path}: non-JSON response`, text.slice(0, 500));
-		throw new SmartlaunchError('The center server returned an unexpected response.');
+		throw new SmartlaunchError('error.unexpected');
 	}
 }
 

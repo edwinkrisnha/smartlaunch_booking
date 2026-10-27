@@ -1,10 +1,13 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { PUBLIC_CENTER_NAME } from '$app/env/public';
+	import { translator } from '#lib/i18n/index.js';
 	import type { PageProps } from './$types';
 
-	let { form }: PageProps = $props();
+	let { data, form }: PageProps = $props();
 	let submitting = $state(false);
+
+	const t = $derived(translator(data.locale));
 
 	const values = $derived(form?.values);
 	const errors = $derived((form?.errors ?? {}) as Record<string, string | undefined>);
@@ -14,8 +17,8 @@
 <section class="signup">
 	<div class="intro">
 		<p class="eyebrow">{PUBLIC_CENTER_NAME}</p>
-		<h1>Create<br /><span class="accent-text">an account</span></h1>
-		<p class="muted">You’ll use this username and password to book online and to log in at the center.</p>
+		<h1>{t('signup.title')}<br /><span class="accent-text">{t('signup.titleAccent')}</span></h1>
+		<p class="muted">{t('signup.intro')}</p>
 		<div class="hazard" aria-hidden="true"></div>
 	</div>
 
@@ -61,24 +64,29 @@
 		<div class="fields">
 			{@render field(
 				'username',
-				'Username',
+				t('field.username'),
 				{ autocomplete: 'username', required: true, maxlength: 20, wide: true },
-				'3–20 characters: letters, numbers, dot, dash or underscore.'
+				t('signup.usernameHint')
 			)}
-			{@render field('password', 'Password', { type: 'password', autocomplete: 'new-password', required: true, maxlength: 64 }, 'At least 6 characters.')}
-			{@render field('confirm', 'Confirm password', { type: 'password', autocomplete: 'new-password', required: true, maxlength: 64 })}
-			{@render field('firstName', 'First name', { autocomplete: 'given-name', required: true, maxlength: 50 })}
-			{@render field('lastName', 'Last name', { autocomplete: 'family-name', required: true, maxlength: 50 })}
-			{@render field('email', 'Email', { type: 'email', autocomplete: 'email', required: true, maxlength: 100 })}
-			{@render field('mobilePhone', 'Mobile phone', { type: 'tel', autocomplete: 'tel', required: true, maxlength: 20 })}
-			{@render field('birthday', 'Date of birth', { type: 'date', autocomplete: 'bday', required: true, max: today })}
-			{@render field('address', 'Address (optional)', { autocomplete: 'street-address', maxlength: 100, wide: true })}
+			{@render field(
+				'password',
+				t('field.password'),
+				{ type: 'password', autocomplete: 'new-password', required: true, maxlength: 64 },
+				t('signup.passwordHint')
+			)}
+			{@render field('confirm', t('signup.confirm'), { type: 'password', autocomplete: 'new-password', required: true, maxlength: 64 })}
+			{@render field('firstName', t('signup.firstName'), { autocomplete: 'given-name', required: true, maxlength: 50 })}
+			{@render field('lastName', t('signup.lastName'), { autocomplete: 'family-name', required: true, maxlength: 50 })}
+			{@render field('email', t('signup.email'), { type: 'email', autocomplete: 'email', required: true, maxlength: 100 })}
+			{@render field('mobilePhone', t('signup.mobilePhone'), { type: 'tel', autocomplete: 'tel', required: true, maxlength: 20 })}
+			{@render field('birthday', t('signup.birthday'), { type: 'date', autocomplete: 'bday', required: true, max: today })}
+			{@render field('address', t('signup.address'), { autocomplete: 'street-address', maxlength: 100, wide: true })}
 		</div>
 
 		<button class="primary" type="submit" disabled={submitting}>
-			{submitting ? 'Creating account…' : 'Create account'}
+			{submitting ? t('signup.submitting') : t('signup.submit')}
 		</button>
-		<p class="switch muted">Already have an account? <a href="/login">Log in</a></p>
+		<p class="switch muted">{t('signup.haveAccount')} <a href="/login">{t('signup.login')}</a></p>
 	</form>
 </section>
 

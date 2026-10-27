@@ -1,5 +1,6 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import { PUBLIC_ALLOW_SIGNUP } from '$app/env/public';
+import { translator } from '#lib/i18n/index.js';
 import { signup, toHttpError, validateSignup, type SignupInput } from '#lib/server/booking.js';
 import { createSession } from '#lib/server/session.js';
 import type { Actions, PageServerLoad } from './$types';
@@ -10,7 +11,7 @@ export const load: PageServerLoad = ({ locals }) => {
 };
 
 export const actions: Actions = {
-	default: async ({ request, cookies }) => {
+	default: async ({ request, cookies, locals }) => {
 		if (!PUBLIC_ALLOW_SIGNUP) error(404, 'Not found');
 
 		const form = await request.formData();
@@ -28,15 +29,18 @@ export const actions: Actions = {
 		// Echo everything back except the passwords.
 		const values = { ...input, password: '' };
 
-		const errors: Record<string, string> = { ...validateSignup(input) };
-		if (input.password !== String(form.get('confirm') ?? '')) errors.confirm = 'The passwords don’t match.';
+		const t = translator(locals.locale);
+		const errors: Record<string, string> = Object.fromEntries(
+			Object.entries(validateSignup(input)).map(([name, err]) => [name, t(err.key, err.params)])
+		);
+		if (input.password !== String(form.get('confirm') ?? '')) errors.confirm = t('signup.error.confirm');
 		if (Object.keys(errors).length > 0) return fail(400, { values, errors });
 
 		let user;
 		try {
 			user = await signup(input);
 		} catch (err) {
-			const { status, message } = toHttpError(err);
+			const { status, message } = toHttpError(err, locals.locale);
 			return fail(status, { values, errors: status === 409 ? { username: message } : { form: message } });
 		}
 

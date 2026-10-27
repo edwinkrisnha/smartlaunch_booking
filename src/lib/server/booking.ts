@@ -1,8 +1,8 @@
 import { CENTER_TIMEZONE } from '$app/env/private';
+import { LocalizedError, translate, type Locale, type MessageKey, type Params } from '#lib/i18n/index.js';
 import { formatLocal, nowInZone, parseLocal, toCompact } from '#lib/time.js';
 import type { Booking, BookingRequest, Layout, Pc, Seat, SessionUser } from '#lib/types.js';
 import * as sl from './smartlaunch';
-import { SmartlaunchError } from './smartlaunch';
 
 export const MIN_MINUTES = 30;
 export const MAX_MINUTES = 24 * 60;
@@ -46,8 +46,8 @@ export interface SignupInput {
 	birthday: string;
 }
 
-/** Field name -> message, for showing errors next to the inputs. */
-export type SignupErrors = Partial<Record<keyof SignupInput | 'form', string>>;
+/** Field name -> error, for showing messages next to the inputs. */
+export type SignupErrors = Partial<Record<keyof SignupInput, BookingError>>;
 
 // The username is also written into SQL unescaped (Users.CreateUser and the
 // follow-up UPDATE), so only allow a strict alphabet.
@@ -59,30 +59,26 @@ const MIN_AGE = 5;
 
 export function validateSignup(input: SignupInput): SignupErrors {
 	const errors: SignupErrors = {};
-	if (!USERNAME_RE.test(input.username)) {
-		errors.username = '3–20 characters: letters, numbers, dot, dash or underscore.';
-	}
-	if (input.password.length < 6 || input.password.length > 64) {
-		errors.password = 'Use 6 to 64 characters.';
-	}
-	if (!EMAIL_RE.test(input.email) || input.email.length > 100) {
-		errors.email = 'Enter a valid email address.';
-	}
-	if (!PHONE_RE.test(input.mobilePhone)) {
-		errors.mobilePhone = 'Enter a valid mobile number, e.g. +62 812 3456 7890.';
-	}
-	if (!input.firstName.trim()) errors.firstName = 'Enter your first name.';
-	else if (input.firstName.length > 50) errors.firstName = 'At most 50 characters.';
-	if (!input.lastName.trim()) errors.lastName = 'Enter your last name.';
-	else if (input.lastName.length > 50) errors.lastName = 'At most 50 characters.';
-	if (input.address.length > 100) errors.address = 'At most 100 characters.';
+	const fail = (field: keyof SignupInput, key: MessageKey, params?: Params) => {
+		errors[field] = new BookingError(key, 400, params);
+	};
+
+	if (!USERNAME_RE.test(input.username)) fail('username', 'signup.usernameHint');
+	if (input.password.length < 6 || input.password.length > 64) fail('password', 'signup.error.password');
+	if (!EMAIL_RE.test(input.email) || input.email.length > 100) fail('email', 'signup.error.email');
+	if (!PHONE_RE.test(input.mobilePhone)) fail('mobilePhone', 'signup.error.mobilePhone');
+	if (!input.firstName.trim()) fail('firstName', 'signup.error.firstName');
+	else if (input.firstName.length > 50) fail('firstName', 'signup.error.tooLong', { max: 50 });
+	if (!input.lastName.trim()) fail('lastName', 'signup.error.lastName');
+	else if (input.lastName.length > 50) fail('lastName', 'signup.error.tooLong', { max: 50 });
+	if (input.address.length > 100) fail('address', 'signup.error.tooLong', { max: 100 });
 
 	const born = parseLocal(`${input.birthday}T00:00`);
 	const now = new Date();
 	const youngest = Date.UTC(now.getUTCFullYear() - MIN_AGE, now.getUTCMonth(), now.getUTCDate()) / 1000;
 	const oldest = Date.UTC(now.getUTCFullYear() - 110, 0, 1) / 1000;
 	if (born === null || born > youngest || born < oldest) {
-		errors.birthday = 'Enter your date of birth.';
+		fail('birthday', 'signup.error.birthday');
 	}
 	return errors;
 }
@@ -94,10 +90,10 @@ export function validateSignup(input: SignupInput): SignupErrors {
 export async function signup(input: SignupInput): Promise<SessionUser> {
 	const errors = validateSignup(input);
 	const first = Object.values(errors)[0];
-	if (first) throw new BookingError(first);
+	if (first) throw first;
 
 	if (await sl.getUser(input.username)) {
-		throw new BookingError('That username is already taken.', 409);
+		throw new BookingError('signup.error.taken', 409);
 	}
 
 	const created = await sl.createUser({
@@ -121,11 +117,11 @@ export async function signup(input: SignupInput): Promise<SessionUser> {
 		Source: 'Online booking'
 	});
 	if (!created) {
-		throw new BookingError('That username can’t be used. Please choose another one.', 409);
+		throw new BookingError('signup.error.rejected', 409);
 	}
 
 	const user = await login(input.username, input.password);
-	if (!user) throw new BookingError('Your account was created, but logging in failed. Please log in.', 500);
+	if (!user) throw new BookingError('signup.error.loginFailed', 500);
 	return user;
 }
 
@@ -164,20 +160,13 @@ export async function listSeats(pcs: Pc[] | Promise<Pc[]> = listPcs()): Promise<
 		}));
 }
 
-export class BookingError extends Error {
-	constructor(
-		message: string,
-		readonly status = 400
-	) {
-		super(message);
-	}
-}
+export class BookingError extends LocalizedError {}
 
 function timeWindow(start: string, minutes: number): { from: number; to: number } {
 	const from = parseLocal(start);
-	if (from === null) throw new BookingError('Start must be a valid date and time (YYYY-MM-DDTHH:mm).');
+	if (from === null) throw new BookingError('error.start');
 	if (!Number.isInteger(minutes) || minutes < MIN_MINUTES || minutes > MAX_MINUTES) {
-		throw new BookingError(`Duration must be between ${MIN_MINUTES} and ${MAX_MINUTES} minutes.`);
+		throw new BookingError('error.duration', 400, { min: MIN_MINUTES, max: MAX_MINUTES });
 	}
 	return { from, to: from + minutes * 60 };
 }
@@ -190,9 +179,9 @@ export async function getUnavailable(start: string, minutes: number): Promise<st
 /** Raw `startdate`/`enddate` passthrough for the REST-shaped endpoint. */
 export async function getUnavailableRaw(startdate: string, enddate: string): Promise<string[]> {
 	if (!/^\d{12}$/.test(startdate) || !/^\d{12}$/.test(enddate)) {
-		throw new BookingError('startdate and enddate must be in yyyyMMddHHmm format.');
+		throw new BookingError('error.compactDates');
 	}
-	if (enddate < startdate) throw new BookingError('enddate must not be before startdate.');
+	if (enddate < startdate) throw new BookingError('error.endBeforeStart');
 	return sl.getBookedComputerIds(startdate, enddate);
 }
 
@@ -239,14 +228,14 @@ export async function createBooking(user: SessionUser, req: BookingRequest): Pro
 	if (CENTER_TIMEZONE) {
 		const earliest = Math.floor(nowInZone(CENTER_TIMEZONE) / 3600) * 3600 + 3600;
 		if (from < earliest) {
-			throw new BookingError(`The earliest arrival is ${formatLocal(earliest).slice(11)}. Please pick that time or later.`);
+			throw new BookingError('error.tooEarly', 400, { time: formatLocal(earliest).slice(11) });
 		}
 	}
 
 	const ids = [...new Set(req.computerIds.map((id) => id.trim()))];
-	if (ids.length === 0) throw new BookingError('Select at least one PC.');
-	if (ids.length > MAX_PCS_PER_BOOKING) throw new BookingError(`At most ${MAX_PCS_PER_BOOKING} PCs per booking.`);
-	if (!ids.every((id) => /^\d+$/.test(id))) throw new BookingError('Invalid PC selection.');
+	if (ids.length === 0) throw new BookingError('error.noPcs');
+	if (ids.length > MAX_PCS_PER_BOOKING) throw new BookingError('error.tooManyPcs', 400, { max: MAX_PCS_PER_BOOKING });
+	if (!ids.every((id) => /^\d+$/.test(id))) throw new BookingError('error.invalidPcs');
 
 	// The order code doubles as the server's idempotency key and is interpolated
 	// into SQL without escaping, so only accept a strict alphabet.
@@ -261,13 +250,13 @@ export async function createBooking(user: SessionUser, req: BookingRequest): Pro
 	]);
 
 	const knownIds = new Set(known.map((c) => String(c.ComputerID)));
-	if (!ids.every((id) => knownIds.has(id))) throw new BookingError('One of the selected PCs does not exist.');
+	if (!ids.every((id) => knownIds.has(id))) throw new BookingError('error.unknownPc');
 
 	// APIParser.BookingAdd only rejects a PC whose existing booking covers our
 	// *start* time, so check the full window here first, like the MVC client does.
 	const taken = ids.filter((id) => unavailable.includes(id));
 	if (taken.length > 0) {
-		throw new BookingError(`Not available for that time: PC ${taken.join(', ')}.`, 409);
+		throw new BookingError('error.taken', 409, { ids: taken.join(', ') });
 	}
 
 	const hours = req.minutes / 60;
@@ -285,15 +274,15 @@ export async function createBooking(user: SessionUser, req: BookingRequest): Pro
 		OrderCode: orderCode
 	});
 
-	if (!ok) throw new BookingError('Someone just booked one of those PCs. Please pick again.', 409);
+	if (!ok) throw new BookingError('error.justBooked', 409);
 	return { orderCode };
 }
 
-/** Map any error to a status and a message that is safe to show a customer. */
-export function toHttpError(err: unknown): { status: number; message: string } {
-	if (err instanceof BookingError || err instanceof SmartlaunchError) {
-		return { status: err.status, message: err.message };
+/** Map any error to a status and a message, in the customer's language, that is safe to show them. */
+export function toHttpError(err: unknown, locale: Locale): { status: number; message: string } {
+	if (err instanceof LocalizedError) {
+		return { status: err.status, message: translate(locale, err.key, err.params) };
 	}
 	console.error(err);
-	return { status: 500, message: 'Something went wrong. Please try again.' };
+	return { status: 500, message: translate(locale, 'error.generic') };
 }

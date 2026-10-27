@@ -1,10 +1,14 @@
 <script lang="ts">
 	import { SvelteSet } from 'svelte/reactivity';
+	import { INTL_LOCALES, translator } from '#lib/i18n/index.js';
 	import { describeLocal } from '#lib/time.js';
 	import { placeSeats } from '#lib/seatmap.js';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
+
+	const t = $derived(translator(data.locale));
+	const intlLocale = $derived(INTL_LOCALES[data.locale]);
 
 	/** Our API endpoints answer either the payload or `{ error }`. */
 	type ApiResponse<T> = Partial<T> & { error?: string };
@@ -104,7 +108,7 @@
 					signal: controller.signal
 				});
 				const body = (await res.json()) as ApiResponse<{ computerIds: string[] }>;
-				if (!res.ok || !body.computerIds) throw new Error(body.error ?? 'Could not check availability.');
+				if (!res.ok || !body.computerIds) throw new Error(body.error ?? t('book.checkFailed'));
 				unavailable = new Set(body.computerIds);
 				for (const id of selected) if (unavailable.has(id)) selected.delete(id);
 			} catch (err) {
@@ -155,11 +159,16 @@
 				return;
 			}
 			const body = (await res.json().catch(() => ({}))) as ApiResponse<{ orderCode: string }>;
-			if (!res.ok) throw new Error(body.error ?? 'Booking failed. Please try again.');
+			if (!res.ok) throw new Error(body.error ?? t('book.failed'));
 
 			result = {
 				kind: 'success',
-				text: `Booked ${computerIds.map(nameOf).join(', ')} on ${describeLocal(start)} for ${hours} h. Order ${body.orderCode}.`
+				text: t('book.success', {
+					pcs: computerIds.map(nameOf).join(', '),
+					when: describeLocal(start, intlLocale),
+					duration: t('book.hours', { n: hours }),
+					order: body.orderCode ?? ''
+				})
 			};
 			pendingKey = '';
 			selected.clear();
@@ -173,7 +182,7 @@
 
 	const formatDate = (style: 'long' | 'short') =>
 		validInput
-			? new Intl.DateTimeFormat(undefined, { weekday: style, day: 'numeric', month: style }).format(
+			? new Intl.DateTimeFormat(intlLocale, { weekday: style, day: 'numeric', month: style }).format(
 					new Date(`${date}T00:00`)
 				)
 			: '—';
@@ -182,9 +191,9 @@
 </script>
 
 <section class="intro">
-	<p class="eyebrow">Online booking</p>
-	<h1>Book a PC</h1>
-	<p class="muted">Choose when you're coming, then pick the PCs you want.</p>
+	<p class="eyebrow">{t('book.eyebrow')}</p>
+	<h1>{t('book.title')}</h1>
+	<p class="muted">{t('book.intro')}</p>
 	<div class="hazard" aria-hidden="true"></div>
 </section>
 
@@ -193,14 +202,14 @@
 {:else}
 	<div class="steps" style:padding-bottom="{barHeight + 24}px">
 		<section class="card" aria-labelledby="when-title">
-			<h2 id="when-title"><span class="step">1</span>When</h2>
+			<h2 id="when-title"><span class="step">1</span>{t('book.when')}</h2>
 			<div class="controls">
 				<label>
-					Date
+					{t('book.date')}
 					<input type="date" bind:value={date} min={earliestDate} required />
 				</label>
 				<label>
-					Arrival time
+					{t('book.arrival')}
 					<input
 						type="time"
 						bind:value={time}
@@ -210,10 +219,10 @@
 					/>
 				</label>
 				<label>
-					Duration
+					{t('book.duration')}
 					<select bind:value={hours}>
 						{#each HOUR_OPTIONS as h (h)}
-							<option value={h}>{h} {h === 1 ? 'hour' : 'hours'}</option>
+							<option value={h}>{t('book.hours', { n: h })}</option>
 						{/each}
 					</select>
 				</label>
@@ -222,8 +231,7 @@
 
 		{#if tooEarly}
 			<p class="notice error" role="alert">
-				The earliest arrival is {earliestTime}
-				{earliestDate === toDateValue(now) ? 'today' : 'tomorrow'}. Pick that time or later.
+				{t(earliestDate === toDateValue(now) ? 'book.tooEarlyToday' : 'book.tooEarlyTomorrow', { time: earliestTime })}
 			</p>
 		{:else if availabilityError}
 			<p class="notice error" role="alert">{availabilityError}</p>
@@ -231,20 +239,20 @@
 
 		<section class="card picker" aria-labelledby="seats-title">
 			<div class="map-head">
-				<h2 id="seats-title"><span class="step">2</span>Pick your PCs</h2>
-				<ul class="legend" aria-label="Legend">
-					<li><span class="swatch free"></span>Available</li>
-					<li><span class="swatch picked"></span>Selected</li>
-					<li><span class="swatch taken"></span>Unavailable</li>
+				<h2 id="seats-title"><span class="step">2</span>{t('book.pick')}</h2>
+				<ul class="legend" aria-label={t('book.legend')}>
+					<li><span class="swatch free"></span>{t('book.available')}</li>
+					<li><span class="swatch picked"></span>{t('book.selected')}</li>
+					<li><span class="swatch taken"></span>{t('book.unavailable')}</li>
 					{#if consoles.size > 0}
-						<li class="kind"><span class="screen" aria-hidden="true"></span>PC</li>
-						<li class="kind">{@render gamepad()}Console</li>
+						<li class="kind"><span class="screen" aria-hidden="true"></span>{t('book.pc')}</li>
+						<li class="kind">{@render gamepad()}{t('book.console')}</li>
 					{/if}
 				</ul>
 			</div>
 
 			{#if layouts.length > 1}
-				<div class="tabs" role="tablist" aria-label="Area">
+				<div class="tabs" role="tablist" aria-label={t('book.area')}>
 					{#each layouts as layout (layout.id)}
 						<button
 							type="button"
@@ -283,7 +291,7 @@
 						{/each}
 					</div>
 				{:else}
-					<p class="empty">No PCs are set up for booking yet.</p>
+					<p class="empty">{t('book.noPcs')}</p>
 				{/if}
 			</div>
 		</section>
@@ -295,13 +303,13 @@
 			{#if result}
 				<p class="notice {result.kind}" role={result.kind === 'error' ? 'alert' : 'status'}>
 					{result.text}
-					{#if result.kind === 'success'}<a href="/bookings">View my bookings</a>{/if}
+					{#if result.kind === 'success'}<a href="/bookings">{t('book.viewBookings')}</a>{/if}
 				</p>
 			{/if}
 
 			<div class="pass-row">
 				<div class="stub">
-					<p class="eyebrow" id="pass-title"><span class="step">3</span>Booking pass</p>
+					<p class="eyebrow" id="pass-title"><span class="step">3</span>{t('book.pass')}</p>
 					<p class="stub-when">
 						<span class="pass-time">{validInput ? time : '--:--'}</span>
 						<span class="pass-date long">{dateLabel}</span>
@@ -311,25 +319,25 @@
 
 				<dl class="facts">
 					<div>
-						<dt>Duration</dt>
-						<dd>{hours} {hours === 1 ? 'hour' : 'hours'}</dd>
+						<dt>{t('book.duration')}</dt>
+						<dd>{t('book.hours', { n: hours })}</dd>
 					</div>
 					<div class="pcs">
-						<dt>PCs</dt>
+						<dt>{t('book.pcs')}</dt>
 						<dd title={selectedIds.map(nameOf).join(', ')}>
-							{selectedIds.length ? selectedIds.map(nameOf).join(', ') : 'None selected'}
+							{selectedIds.length ? selectedIds.map(nameOf).join(', ') : t('book.noneSelected')}
 						</dd>
 					</div>
 					{#if selectedIds.length > 1}
 						<div>
-							<dt>Total PC time</dt>
-							<dd class="total">{selectedIds.length * hours} hours</dd>
+							<dt>{t('book.totalTime')}</dt>
+							<dd class="total">{t('book.hours', { n: selectedIds.length * hours })}</dd>
 						</div>
 					{/if}
 				</dl>
 
 				<button class="primary" type="button" disabled={!canBook || submitting} onclick={confirm}>
-					{submitting ? 'Booking…' : checking ? 'Checking…' : 'Confirm booking'}
+					{submitting ? t('book.booking') : checking ? t('book.checking') : t('book.confirm')}
 				</button>
 			</div>
 		</div>
@@ -347,8 +355,8 @@
 		{style}
 		disabled={taken || tooEarly || !validInput}
 		aria-pressed={picked}
-		aria-label={taken ? `${describe(id)}, unavailable` : describe(id)}
-		title={taken ? `${describe(id)} is not available` : describe(id)}
+		aria-label={taken ? t('book.seatTaken', { name: describe(id) }) : describe(id)}
+		title={taken ? t('book.seatTakenTitle', { name: describe(id) }) : describe(id)}
 		onclick={() => toggle(id)}
 	>
 		{#if consoles.has(id)}

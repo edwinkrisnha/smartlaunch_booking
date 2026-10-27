@@ -12,6 +12,7 @@ declare global {
 		// interface Error {}
 		interface Locals {
 			user: import('#lib/types.js').SessionUser | null;
+			locale: import('#lib/i18n/index.js').Locale;
 		}
 		// interface PageData {}
 		// interface PageState {}

@@ -9,7 +9,7 @@ import type { RequestHandler } from './$types';
  * — creates the account (POST /users/create) and starts a session.
  */
 export const POST: RequestHandler = endpoint(async ({ request, cookies }) => {
-	if (!PUBLIC_ALLOW_SIGNUP) throw new BookingError('Sign-up is turned off.', 404);
+	if (!PUBLIC_ALLOW_SIGNUP) throw new BookingError('signup.error.disabled', 404);
 
 	const body = (await readJson(request)) as Record<string, unknown>;
 	const text = (key: string) => String(body[key] ?? '').trim();

@@ -12,5 +12,5 @@ export const load: LayoutServerLoad = ({ locals }) => {
 			`THEME "${THEME}" not found in src/themes (available: ${availableThemes.join(', ')}); using "${theme.name}".`
 		);
 	}
-	return { user: locals.user, theme };
+	return { user: locals.user, theme, locale: locals.locale };
 };
