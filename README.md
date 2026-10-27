@@ -15,6 +15,7 @@ The REST API is protected by one shared Basic-auth credential, so the browser ne
 | App endpoint | Smartlaunch REST call |
 | --- | --- |
 | `POST /api/login` `{username, password}` | `GET /users/{username}/check?password=` then `GET /users/{username}` |
+| `POST /api/signup` `{username, password, email, mobilePhone, firstName?, lastName?, birthday}` | `GET /users/{username}` (is it taken?), `POST /users/create`, then the login calls |
 | `POST /api/logout` | none |
 | `GET /api/layouts` | `GET /layoutgroups` |
 | `GET /api/computerlayoutpositions` | `GET /computerlayoutpositions` |
@@ -23,13 +24,14 @@ The REST API is protected by one shared Basic-auth credential, so the browser ne
 | `GET /api/bookings` | `GET /bookings`, filtered to the logged-in customer |
 | `POST /api/bookings` `{start, minutes, computerIds, orderCode?}` | `POST /bookings` |
 
-The pages are `/login`, `/` (book) and `/bookings` (my bookings).
+The pages are `/login`, `/signup` (create an account), `/` (book) and `/bookings` (my bookings).
 
 ### Things worth knowing
 
 - **Times are center wall-clock time.** The server converts booking timestamps with `New DateTime(1970,1,1).AddSeconds(ts)`, with no time zone involved. The app sends and reads timestamps as naive wall-clock seconds (`src/lib/time.ts`), so `18:00` in the form becomes `18:00` in Smartlaunch whatever zone Cloudflare runs in.
 - **Availability is re-checked before booking.** `APIParser.BookingAdd` only rejects a PC whose existing booking covers the new *start* time. The app first checks the whole window with `/booking/getbooked`, as the MVC client does.
-- **SQL escaping.** The server builds the booking `INSERT` by string concatenation. The app doubles quotes in every text field, allows only numeric PC IDs, and restricts order codes to `[A-Z0-9]`.
+- **SQL escaping.** The server builds the booking `INSERT` and the sign-up profile `UPDATE` by string concatenation. The app doubles quotes in every text field, allows only numeric PC IDs, restricts order codes to `[A-Z0-9]`, and restricts usernames to letters, numbers, `.`, `-` and `_`.
+- **Sign-up.** New accounts go into the server's "members" group (or its first group). The API has no "unspecified" gender, so accounts are stored with the server's default, female, as the MVC client also does. Date of birth is required so age limits on apps keep working. The server may refuse a username through its profanity filter; the app then asks for another one.
 - **Duplicate protection.** Each confirm sends an `OrderCode`; the server ignores a second booking with the same code.
 - **Payments are out of scope.** Unlike the MVC client's flow, which goes through the payment providers and the Azure DB, this app writes the booking straight to the center server.
 
@@ -88,6 +90,7 @@ The `esportsnord` theme uses Unbounded as a free stand-in for INTEGRAL CF. To us
 | `CENTER_TIMEZONE` | no | Optional IANA zone (e.g. `Asia/Jakarta`); rejects past start times server-side |
 | `SL_LICENSE_EMAIL` | no | Optional; adds `?licenseemail=` for relay setups |
 | `PUBLIC_CENTER_NAME` | no | Name shown in the header |
+| `PUBLIC_ALLOW_SIGNUP` | no | `false` hides `/signup` and turns off `/api/signup`; on by default |
 | `THEME` | no | Theme folder under `src/themes`; defaults to `default` (see [Themes](#themes)) |
 
 ### Reaching the center server from Cloudflare
@@ -170,4 +173,4 @@ npm run deploy                                   # first run creates the "smartl
 npx wrangler pages secret put SL_API_USERNAME    # repeat for each variable
 ```
 
-**Recommended:** add a free Cloudflare rate-limiting rule on `/api/login` and `/login` to slow down password guessing.
+**Recommended:** add a free Cloudflare rate-limiting rule on `/login`, `/api/login`, `/signup` and `/api/signup` to slow down password guessing and bulk sign-ups.

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { PUBLIC_CENTER_NAME } from '$app/env/public';
+	import { PUBLIC_ALLOW_SIGNUP, PUBLIC_CENTER_NAME } from '$app/env/public';
 	import type { PageProps } from './$types';
 
 	let { form }: PageProps = $props();
@@ -41,6 +41,9 @@
 		<button class="primary" type="submit" disabled={submitting}>
 			{submitting ? 'Logging in…' : 'Log in'}
 		</button>
+		{#if PUBLIC_ALLOW_SIGNUP}
+			<p class="switch muted">No account yet? <a href="/signup">Create one</a></p>
+		{/if}
 	</form>
 </section>
 
@@ -79,6 +82,10 @@
 
 	form button {
 		justify-self: start;
+	}
+
+	.switch {
+		margin: 0;
 	}
 
 	@media (max-width: 720px) {

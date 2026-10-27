@@ -26,6 +26,30 @@ export interface RawUser {
 	Deleted: boolean;
 }
 
+export interface RawUserCreate {
+	UserName: string;
+	/** Empty picks the "members" group (or the first group). */
+	UsergroupName: string;
+	Password: string;
+	Avatar: string;
+	FirstName: string;
+	LastName: string;
+	/** Wall-clock unix seconds, like booking times. */
+	Birthday: number;
+	Address: string;
+	City: string;
+	Zip: string;
+	State: string;
+	Country: string;
+	Email: string;
+	Telephone: string;
+	MobilePhone: string;
+	/** 0 = female, 1 = male; the API has no "unspecified". */
+	Sex: number;
+	PersonalNumber: string;
+	Source: string;
+}
+
 export interface RawComputer {
 	ComputerID: string;
 	ComputerGroupID: string;
@@ -76,7 +100,7 @@ function buildUrl(path: string, query: Record<string, string> = {}): string {
 async function request<T>(
 	method: 'GET' | 'POST',
 	path: string,
-	{ query, body }: { query?: Record<string, string>; body?: unknown } = {}
+	{ query, body, notFoundAsNull }: { query?: Record<string, string>; body?: unknown; notFoundAsNull?: boolean } = {}
 ): Promise<T> {
 	let res: Response;
 	try {
@@ -102,6 +126,7 @@ async function request<T>(
 	}
 
 	const text = await res.text();
+	if (res.status === 404 && notFoundAsNull) return null as T;
 	if (!res.ok) {
 		console.error(`Smartlaunch ${method} ${path}: HTTP ${res.status}`, text.slice(0, 500));
 		throw new SmartlaunchError('The center server returned an error. Please try again later.');
@@ -122,9 +147,19 @@ export async function checkPassword(username: string, password: string): Promise
 	return (await request<boolean>('GET', `/users/${seg(username)}/check`, { query: { password } })) === true;
 }
 
-/** GET /users/{username} */
+/** GET /users/{username} — null when no such user (the server answers 404). */
 export async function getUser(username: string): Promise<RawUser | null> {
-	return request<RawUser | null>('GET', `/users/${seg(username)}`);
+	return request<RawUser | null>('GET', `/users/${seg(username)}`, { notFoundAsNull: true });
+}
+
+/**
+ * POST /users/create (UserCreateFull). True when the account was created; false
+ * when the username is taken or rejected by the server's profanity filter.
+ * The server writes the profile fields into SQL unescaped, so callers must
+ * pass them through the same quoting as bookings.
+ */
+export async function createUser(uc: RawUserCreate): Promise<boolean> {
+	return (await request<boolean>('POST', '/users/create', { body: { uc } })) === true;
 }
 
 /** GET /layoutgroups */

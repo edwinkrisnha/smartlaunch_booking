@@ -33,6 +33,97 @@ export async function login(username: string, password: string): Promise<Session
 	};
 }
 
+export interface SignupInput {
+	username: string;
+	password: string;
+	email: string;
+	mobilePhone: string;
+	firstName: string;
+	lastName: string;
+	/** `YYYY-MM-DD` */
+	birthday: string;
+}
+
+/** Field name -> message, for showing errors next to the inputs. */
+export type SignupErrors = Partial<Record<keyof SignupInput | 'form', string>>;
+
+// The username is also written into SQL unescaped (Users.CreateUser and the
+// follow-up UPDATE), so only allow a strict alphabet.
+const USERNAME_RE = /^[A-Za-z0-9_.-]{3,20}$/;
+// Apostrophes are valid before the @ (o'neil@...); quotes are escaped before they reach the server.
+const EMAIL_RE = /^[^\s@"]+@[^\s@"']+\.[^\s@"']+$/;
+const PHONE_RE = /^\+?[0-9 ()-]{6,20}$/;
+const MIN_AGE = 5;
+
+export function validateSignup(input: SignupInput): SignupErrors {
+	const errors: SignupErrors = {};
+	if (!USERNAME_RE.test(input.username)) {
+		errors.username = '3–20 characters: letters, numbers, dot, dash or underscore.';
+	}
+	if (input.password.length < 6 || input.password.length > 64) {
+		errors.password = 'Use 6 to 64 characters.';
+	}
+	if (!EMAIL_RE.test(input.email) || input.email.length > 100) {
+		errors.email = 'Enter a valid email address.';
+	}
+	if (!PHONE_RE.test(input.mobilePhone)) {
+		errors.mobilePhone = 'Enter a valid mobile number, e.g. +62 812 3456 7890.';
+	}
+	if (input.firstName.length > 50) errors.firstName = 'At most 50 characters.';
+	if (input.lastName.length > 50) errors.lastName = 'At most 50 characters.';
+
+	const born = parseLocal(`${input.birthday}T00:00`);
+	const now = new Date();
+	const youngest = Date.UTC(now.getUTCFullYear() - MIN_AGE, now.getUTCMonth(), now.getUTCDate()) / 1000;
+	const oldest = Date.UTC(now.getUTCFullYear() - 110, 0, 1) / 1000;
+	if (born === null || born > youngest || born < oldest) {
+		errors.birthday = 'Enter your date of birth.';
+	}
+	return errors;
+}
+
+/**
+ * Creates the account via POST /users/create, then logs it in. Throws
+ * BookingError with a customer-facing message on failure.
+ */
+export async function signup(input: SignupInput): Promise<SessionUser> {
+	const errors = validateSignup(input);
+	const first = Object.values(errors)[0];
+	if (first) throw new BookingError(first);
+
+	if (await sl.getUser(input.username)) {
+		throw new BookingError('That username is already taken.', 409);
+	}
+
+	const created = await sl.createUser({
+		UserName: input.username,
+		UsergroupName: '',
+		Password: input.password,
+		Avatar: '',
+		FirstName: sqlText(input.firstName.trim(), 50),
+		LastName: sqlText(input.lastName.trim(), 50),
+		Birthday: parseLocal(`${input.birthday}T00:00`)!,
+		Address: '',
+		City: '',
+		Zip: '',
+		State: '',
+		Country: '',
+		Email: sqlText(input.email.trim(), 100),
+		Telephone: '',
+		MobilePhone: sqlText(input.mobilePhone.trim(), 20),
+		Sex: 0,
+		PersonalNumber: '',
+		Source: 'Online booking'
+	});
+	if (!created) {
+		throw new BookingError('That username can’t be used. Please choose another one.', 409);
+	}
+
+	const user = await login(input.username, input.password);
+	if (!user) throw new BookingError('Your account was created, but logging in failed. Please log in.', 500);
+	return user;
+}
+
 export async function listLayouts(): Promise<Layout[]> {
 	const groups = await sl.getLayoutGroups();
 	return groups.map((g) => ({ id: String(g.LayoutGroupID), name: g.Name }));

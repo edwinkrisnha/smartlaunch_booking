@@ -2,7 +2,7 @@ import { json, redirect } from '@sveltejs/kit';
 import type { Handle } from '@sveltejs/kit/hooks';
 import { readSession } from '#lib/server/session.js';
 
-const PUBLIC_PATHS = new Set(['/login', '/api/login']);
+const PUBLIC_PATHS = new Set(['/login', '/api/login', '/signup', '/api/signup']);
 
 export const handle: Handle = async ({ event, resolve }) => {
 	event.locals.user = await readSession(event.cookies);
