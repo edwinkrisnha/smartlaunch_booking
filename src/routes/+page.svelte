@@ -361,9 +361,15 @@
 		margin-inline: auto;
 	}
 
-	/* The picker goes wider than the column, but keeps a margin from the screen edges. */
+	/* The picker goes wider than the column, but keeps a margin from the screen edges on wide screens. */
 	.picker {
 		margin-inline: clamp(0px, 3vw, 48px);
+	}
+
+	@media (max-width: 1200px) {
+		.picker {
+			margin-inline: 0;
+		}
 	}
 
 	.intro {
@@ -400,11 +406,12 @@
 		place-items: center;
 		width: 1.9rem;
 		height: 1.6rem;
-		background: var(--fire);
-		color: var(--weiss);
+		background: var(--step-bg);
+		color: var(--step-fg);
+		border-radius: var(--step-radius);
 		font-size: 0.75rem;
 		letter-spacing: 0;
-		clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
+		clip-path: polygon(var(--step-cut) 0, 100% 0, calc(100% - var(--step-cut)) 100%, 0 100%);
 	}
 
 	.controls {
@@ -448,16 +455,16 @@
 	}
 
 	.swatch.free {
-		border: 2px solid var(--free);
+		border: 2px solid var(--seat-free);
 	}
 
 	.swatch.picked {
-		background: var(--fire);
+		background: var(--seat-picked);
 	}
 
 	.swatch.taken {
-		background: repeating-linear-gradient(-45deg, var(--rosewood) 0 3px, transparent 3px 6px);
-		border: 1px solid var(--rosewood);
+		background: repeating-linear-gradient(-45deg, var(--seat-taken) 0 3px, transparent 3px 6px);
+		border: 1px solid var(--seat-taken);
 	}
 
 	.tabs {
@@ -476,9 +483,9 @@
 		margin-bottom: -1px;
 		font-family: var(--font-sub);
 		font-size: 0.78rem;
-		font-weight: 400;
-		letter-spacing: 0.05em;
-		text-transform: uppercase;
+		font-weight: var(--sub-weight);
+		letter-spacing: var(--sub-spacing);
+		text-transform: var(--sub-case);
 		color: var(--muted);
 	}
 
@@ -488,15 +495,16 @@
 
 	.tabs button[aria-selected='true'] {
 		color: var(--text);
-		border-bottom-color: var(--fire);
+		border-bottom-color: var(--accent);
 	}
 
 	.area {
 		margin: 0.75rem 0 0;
 		font-family: var(--font-sub);
+		font-weight: var(--sub-weight);
 		font-size: 0.78rem;
-		letter-spacing: 0.05em;
-		text-transform: uppercase;
+		letter-spacing: var(--sub-spacing);
+		text-transform: var(--sub-case);
 		color: var(--muted);
 	}
 
@@ -505,7 +513,7 @@
 		margin-top: 1rem;
 		overflow: auto;
 		border-radius: var(--radius);
-		background-color: var(--bg);
+		background-color: var(--floor-bg);
 		background-image: radial-gradient(var(--grid-dot) 1.2px, transparent 1.2px);
 		background-size: 18px 18px;
 		transition: opacity 0.2s;
@@ -524,16 +532,19 @@
 		transform-origin: 0 0;
 	}
 
+	/* Icon + number must fit the tile whatever font the theme uses, hence the tight gap and line height. */
 	.map .seat {
 		position: absolute;
 		width: var(--seat-w);
 		height: var(--seat-h);
 		min-height: 0;
 		padding: 0.2rem 0.15rem;
+		gap: 0.2rem;
 	}
 
 	.map .seat-name {
 		font-size: 0.9rem;
+		line-height: 1.1;
 		letter-spacing: 0;
 	}
 
@@ -558,22 +569,22 @@
 		gap: 0.3rem;
 		min-height: 52px;
 		padding: 0.3rem;
-		background: var(--surface);
-		border: 2px solid var(--free);
-		color: var(--text);
+		background: var(--seat-bg);
+		border: 2px solid var(--seat-free);
+		color: var(--seat-text);
 	}
 
 	.screen {
 		width: 60%;
 		height: 3px;
 		border-radius: 2px;
-		background: var(--free);
+		background: var(--seat-free);
 	}
 
 	.pad {
 		width: 16px;
 		height: 11px;
-		fill: var(--free);
+		fill: var(--seat-free);
 		flex: none;
 	}
 
@@ -586,9 +597,9 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
-		font-family: var(--font-sub);
+		font-family: var(--seat-font);
 		font-size: 0.7rem;
-		font-weight: 400;
+		font-weight: var(--seat-weight);
 		letter-spacing: 0.03em;
 	}
 
@@ -598,39 +609,39 @@
 	}
 
 	.seat.picked {
-		background: var(--fire);
-		border-color: var(--fire);
-		color: var(--weiss);
-		box-shadow: 0 4px 14px rgb(207 37 40 / 0.4);
+		background: var(--seat-picked);
+		border-color: var(--seat-picked);
+		color: var(--seat-picked-ink);
+		box-shadow: var(--seat-picked-glow);
 	}
 
 	.seat.picked .screen {
-		background: var(--saffron);
+		background: var(--seat-picked-mark);
 	}
 
 	.seat.picked .pad {
-		fill: var(--saffron);
+		fill: var(--seat-picked-mark);
 	}
 
 	.seat.picked:not(:disabled):hover {
-		background: var(--fire-hover);
+		background: var(--seat-picked-hover);
 	}
 
 	.seat.taken {
 		background:
-			repeating-linear-gradient(-45deg, rgb(99 16 17 / 0.45) 0 4px, transparent 4px 9px),
-			var(--surface);
-		border-color: var(--rosewood);
+			repeating-linear-gradient(-45deg, var(--seat-taken-stripe) 0 4px, transparent 4px 9px),
+			var(--seat-bg);
+		border-color: var(--seat-taken);
 		color: var(--muted);
 		opacity: 1;
 	}
 
 	.seat.taken .screen {
-		background: var(--rosewood);
+		background: var(--seat-taken);
 	}
 
 	.seat.taken .pad {
-		fill: var(--rosewood);
+		fill: var(--seat-taken);
 	}
 
 	.seat.taken .seat-name {
@@ -642,9 +653,9 @@
 		position: fixed;
 		inset: auto 0 0;
 		z-index: 10;
-		background: var(--jet);
-		border-top: 3px solid var(--fire);
-		box-shadow: 0 -12px 32px rgb(0 0 0 / 0.45);
+		background: var(--bar-bg);
+		border-top: 3px solid var(--bar-border);
+		box-shadow: var(--bar-shadow);
 	}
 
 	.pass-inner {
@@ -672,10 +683,11 @@
 		gap: 0.35rem;
 		padding: 0.6rem 1.4rem 0.6rem 0.9rem;
 		margin: -0.15rem 0;
-		background: var(--rosewood);
-		color: var(--weiss);
-		border-right: 2px dashed rgb(255 255 255 / 0.4);
-		clip-path: polygon(0 0, 100% 0, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+		background: var(--pass-bg);
+		color: var(--pass-fg);
+		border-radius: var(--radius);
+		border-right: 2px dashed var(--pass-tear);
+		clip-path: polygon(0 0, 100% 0, 100% 100%, var(--pass-cut) 100%, 0 calc(100% - var(--pass-cut)));
 	}
 
 	.stub .eyebrow {
@@ -684,6 +696,7 @@
 		gap: 0.5rem;
 		margin: 0;
 		font-size: 0.68rem;
+		color: var(--pass-accent);
 	}
 
 	.stub .step {
@@ -701,11 +714,11 @@
 
 	.pass-time {
 		font-family: var(--font-display);
-		font-weight: 900;
+		font-weight: var(--display-weight);
 		font-size: 1.9rem;
 		line-height: 1;
-		letter-spacing: -0.01em;
-		text-shadow: 0.06em 0.06em 0 var(--verdigris);
+		letter-spacing: var(--display-spacing);
+		text-shadow: var(--headline-shadow);
 	}
 
 	.pass-date {
@@ -738,9 +751,10 @@
 
 	dt {
 		font-family: var(--font-sub);
+		font-weight: var(--sub-weight);
 		font-size: 0.66rem;
-		letter-spacing: 0.05em;
-		text-transform: uppercase;
+		letter-spacing: var(--sub-spacing);
+		text-transform: var(--sub-case);
 		color: var(--muted);
 	}
 

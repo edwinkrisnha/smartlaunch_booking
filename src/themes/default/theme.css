@@ -1,0 +1,160 @@
+/*
+ * Default theme: neutral, light and dark, system fonts.
+ *
+ * This file defines every variable the app uses, so it is also the reference
+ * for writing your own theme. To make one:
+ *   1. Create src/themes/<name>/theme.css starting with
+ *        @import '../default/theme.css';
+ *      and override only the variables you want to change.
+ *   2. Optionally add src/themes/<name>/favicon.svg.
+ *   3. Set THEME=<name> in .env (or in Cloudflare Pages), then rebuild.
+ * A theme can also add its own rules after the variables, and reference
+ * images next to it with relative url(...) paths.
+ */
+
+:root {
+	/* Typography */
+	--font-display: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+	--font-sub: var(--font-display);
+	--font-body: var(--font-display);
+	--body-weight: 400;
+	--display-weight: 800;
+	--display-spacing: -0.02em;
+	--display-case: none;
+	--sub-weight: 600;
+	--sub-spacing: 0.06em;
+	--sub-case: uppercase;
+
+	/* Page and surfaces */
+	--bg: #f4f5f7;
+	--bg-texture: none;
+	--surface: #ffffff;
+	--surface-2: #eef0f3;
+	--input-bg: #ffffff;
+	--border: #d7dbe1;
+	--card-border: 1px solid var(--border);
+	--card-shadow: 0 1px 2px rgb(16 24 40 / 0.06);
+	--text: #111827;
+	--muted: #5b6474;
+
+	/* Accent and states */
+	--accent: #2563eb;
+	--accent-hover: #1d4ed8;
+	--accent-ink: #ffffff;
+	--focus: #2563eb;
+	--highlight: #2563eb;
+	--eyebrow: #2563eb;
+	--danger: #b42318;
+	--danger-bg: #fdecea;
+	--success: #067647;
+	--success-bg: #e6f6ed;
+
+	/* Headlines */
+	--headline-shadow: none;
+	--headline-accent: var(--accent);
+
+	/* Shapes. --cut / --panel-cut / --step-cut / --pass-cut slant or clip corners; 0px keeps them square. */
+	--radius: 8px;
+	--button-radius: 8px;
+	--cut: 0px;
+	--panel-cut: 0px;
+	--step-cut: 0px;
+	--step-radius: 6px;
+	--pass-cut: 0px;
+
+	/* Buttons */
+	--button-font: var(--font-body);
+	--button-weight: 600;
+	--button-spacing: normal;
+	--button-case: none;
+
+	/* Decoration under page titles */
+	--hazard-display: none;
+	--hazard-color: var(--accent);
+
+	/* Header */
+	--header-bg: var(--surface);
+	--header-fg: var(--text);
+	--header-border: 1px solid var(--border);
+	--header-cut: 0px;
+	--nav-font: var(--font-body);
+	--nav-weight: 600;
+	--nav-case: none;
+	--nav-size: 0.95rem;
+	--nav-hover: var(--accent);
+	--nav-shadow: none;
+	--nav-active: var(--accent);
+	--nav-underline: var(--accent);
+	--strip-bg: transparent;
+	--strip-fg: var(--muted);
+	--strip-hover-bg: var(--text);
+	--strip-hover-fg: var(--surface);
+	--strip-cut: 0px;
+	--brand-font: var(--font-display);
+	--brand-weight: 800;
+	--brand-case: none;
+	--mark-bg: var(--accent);
+	--mark-skew: 0deg;
+	--mark-radius: 4px;
+
+	/* Step badges (1, 2, 3) */
+	--step-bg: var(--accent);
+	--step-fg: #ffffff;
+
+	/* PC map */
+	--floor-bg: #eef0f3;
+	--grid-dot: rgb(17 24 39 / 0.1);
+	--seat-bg: var(--surface);
+	--seat-text: var(--text);
+	--seat-font: var(--font-body);
+	--seat-weight: 700;
+	--seat-free: #12a150;
+	--seat-picked: var(--accent);
+	--seat-picked-ink: #ffffff;
+	--seat-picked-mark: #ffffff;
+	--seat-picked-hover: var(--accent-hover);
+	--seat-picked-glow: 0 4px 12px rgb(37 99 235 / 0.3);
+	--seat-taken: #9aa3af;
+	--seat-taken-stripe: rgb(154 163 175 / 0.25);
+
+	/* Booking bar and ticket stub */
+	--bar-bg: var(--surface);
+	--bar-border: var(--border);
+	--bar-shadow: 0 -8px 24px rgb(16 24 40 / 0.08);
+	--pass-bg: #1e3a8a;
+	--pass-fg: #ffffff;
+	--pass-accent: #bfdbfe;
+	--pass-tear: rgb(255 255 255 / 0.45);
+
+	color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--bg: #0f1115;
+		--surface: #181b21;
+		--surface-2: #232730;
+		--input-bg: #0f1115;
+		--border: #2f3540;
+		--card-shadow: none;
+		--text: #e7e9ee;
+		--muted: #9aa3b2;
+		--accent: #3b82f6;
+		--accent-hover: #60a5fa;
+		--focus: #60a5fa;
+		--highlight: #60a5fa;
+		--eyebrow: #60a5fa;
+		--danger: #ff8a80;
+		--danger-bg: rgb(255 138 128 / 0.12);
+		--success: #6ee7a8;
+		--success-bg: rgb(110 231 168 / 0.12);
+		--floor-bg: #0f1115;
+		--grid-dot: rgb(255 255 255 / 0.07);
+		--seat-free: #34d399;
+		--seat-picked-glow: 0 4px 14px rgb(59 130 246 / 0.4);
+		--seat-taken: #4b5262;
+		--seat-taken-stripe: rgb(75 82 98 / 0.35);
+		--bar-shadow: 0 -10px 28px rgb(0 0 0 / 0.4);
+		color-scheme: dark;
+	}
+}

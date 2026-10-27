@@ -1,0 +1,132 @@
+/*
+ * eSports Nord theme, matching https://esportsnord.codin-it.de
+ * Brand colours: Fire Engine Red, Jet, Weiss, Rosewood, Saffron, Verdigris.
+ * Unbounded stands in for INTEGRAL CF (commercial); Zen Dots for subheaders;
+ * Montserrat for text.
+ */
+/* Remote @imports must come first: the default theme below gets inlined at build time. */
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Unbounded:wght@700;900&family=Zen+Dots&display=swap');
+@import '../default/theme.css';
+
+/* `:root:root` outranks the default theme's dark-mode block, so this theme stays dark either way. */
+:root:root {
+	--fire: #cf2528;
+	--fire-hover: #e0393c;
+	--jet: #363436;
+	--weiss: #ffffff;
+	--rosewood: #631011;
+	--saffron: #f6c233;
+	--verdigris: #409d9d;
+
+	/* Typography */
+	--font-display: 'Unbounded', 'Arial Black', sans-serif;
+	--font-sub: 'Zen Dots', 'Unbounded', sans-serif;
+	--font-body: 'Montserrat', system-ui, sans-serif;
+	--body-weight: 500;
+	--display-weight: 900;
+	--display-spacing: -0.01em;
+	--display-case: uppercase;
+	--sub-weight: 400;
+	--sub-spacing: 0.05em;
+
+	/* Near-black floor with a faint scratched-metal texture, Jet panels. */
+	--bg: #121112;
+	--bg-texture:
+		repeating-linear-gradient(117deg, rgb(255 255 255 / 0.018) 0 1px, transparent 1px 23px),
+		repeating-linear-gradient(32deg, rgb(255 255 255 / 0.014) 0 1px, transparent 1px 37px),
+		repeating-linear-gradient(-71deg, rgb(255 255 255 / 0.012) 0 1px, transparent 1px 51px);
+	--surface: var(--jet);
+	--surface-2: #434043;
+	--input-bg: #121112;
+	--border: #4d4a4d;
+	--card-border: none;
+	--card-shadow: none;
+	--text: var(--weiss);
+	--muted: #bdb9bc;
+
+	--accent: var(--fire);
+	--accent-hover: var(--fire-hover);
+	--accent-ink: var(--weiss);
+	--focus: var(--saffron);
+	--highlight: var(--saffron);
+	--eyebrow: var(--saffron);
+	--danger: #ff8a8c;
+	--danger-bg: rgb(207 37 40 / 0.16);
+	--success: #7fd3d3;
+	--success-bg: rgb(64 157 157 / 0.18);
+
+	/* White headlines with a hard Verdigris offset, Saffron second lines. */
+	--headline-shadow: 0.06em 0.06em 0 var(--verdigris);
+	--headline-accent: var(--saffron);
+
+	/* Angular shapes: slanted buttons and badges, clipped panel corners. */
+	--radius: 2px;
+	--button-radius: 0;
+	--cut: 14px;
+	--panel-cut: 22px;
+	--step-cut: 6px;
+	--step-radius: 0;
+	--pass-cut: 10px;
+
+	--button-font: var(--font-display);
+	--button-weight: 700;
+	--button-spacing: 0.06em;
+	--button-case: uppercase;
+
+	--hazard-display: block;
+	--hazard-color: var(--fire);
+
+	/* Red header band with an angled lower edge and a Saffron account strip. */
+	--header-bg: linear-gradient(180deg, var(--fire), #b51f22);
+	--header-fg: var(--weiss);
+	--header-border: none;
+	--header-cut: 10px;
+	--nav-font: var(--font-display);
+	--nav-weight: 700;
+	--nav-case: uppercase;
+	--nav-size: 1rem;
+	--nav-hover: #ffe7a3;
+	--nav-shadow: 0 2px 0 rgb(0 0 0 / 0.25);
+	--nav-active: var(--saffron);
+	--nav-underline: transparent;
+	--strip-bg: var(--saffron);
+	--strip-fg: var(--jet);
+	--strip-hover-bg: var(--jet);
+	--strip-hover-fg: var(--saffron);
+	--strip-cut: 18px;
+	--brand-weight: 900;
+	--brand-case: uppercase;
+	--mark-bg: var(--weiss);
+	--mark-skew: -14deg;
+	--mark-radius: 0;
+
+	--step-bg: var(--fire);
+	--step-fg: var(--weiss);
+
+	/* PC map */
+	--floor-bg: #121112;
+	--grid-dot: rgb(255 255 255 / 0.07);
+	--seat-bg: var(--jet);
+	--seat-text: var(--weiss);
+	--seat-font: var(--font-sub);
+	--seat-weight: 400;
+	--seat-free: var(--verdigris);
+	--seat-picked: var(--fire);
+	--seat-picked-ink: var(--weiss);
+	--seat-picked-mark: var(--saffron);
+	--seat-picked-hover: var(--fire-hover);
+	--seat-picked-glow: 0 4px 14px rgb(207 37 40 / 0.4);
+	--seat-taken: var(--rosewood);
+	--seat-taken-stripe: rgb(99 16 17 / 0.45);
+
+	/* Booking bar with a Rosewood ticket stub. */
+	--bar-bg: var(--jet);
+	--bar-border: var(--fire);
+	--bar-shadow: 0 -12px 32px rgb(0 0 0 / 0.45);
+	--pass-bg: var(--rosewood);
+	--pass-fg: var(--weiss);
+	--pass-accent: var(--saffron);
+	--pass-tear: rgb(255 255 255 / 0.4);
+
+	color-scheme: dark;
+}

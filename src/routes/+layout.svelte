@@ -1,6 +1,5 @@
 <script lang="ts">
 	import '../app.css';
-	import favicon from '#lib/assets/favicon.svg';
 	import { PUBLIC_CENTER_NAME } from '$app/env/public';
 	import { page } from '$app/state';
 	import type { LayoutProps } from './$types';
@@ -9,7 +8,8 @@
 </script>
 
 <svelte:head>
-	<link rel="icon" href={favicon} />
+	<link rel="stylesheet" href={data.theme.stylesheet} />
+	<link rel="icon" href={data.theme.favicon} />
 	<title>Book a PC · {PUBLIC_CENTER_NAME}</title>
 </svelte:head>
 
@@ -37,16 +37,24 @@
 </main>
 
 <style>
-	/* Red band with an angled lower edge, like the landing page header. */
+	/* Header band; --header-cut gives it an angled lower edge. */
 	header {
 		position: relative;
-		background: linear-gradient(180deg, var(--fire), #b51f22);
-		color: var(--weiss);
-		clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), 70% calc(100% - 10px), calc(70% - 10px) 100%, 0 100%);
-		padding-bottom: 10px;
+		background: var(--header-bg);
+		color: var(--header-fg);
+		border-bottom: var(--header-border);
+		clip-path: polygon(
+			0 0,
+			100% 0,
+			100% calc(100% - var(--header-cut)),
+			70% calc(100% - var(--header-cut)),
+			calc(70% - var(--header-cut)) 100%,
+			0 100%
+		);
+		padding-bottom: var(--header-cut);
 	}
 
-	/* Saffron strip slanting in from the top, carrying the account controls. */
+	/* Account strip at the top right; --strip-cut slants its leading edge. */
 	.strip {
 		display: flex;
 		align-items: center;
@@ -54,33 +62,34 @@
 		gap: 1rem;
 		width: fit-content;
 		margin-left: auto;
-		padding: 0.2rem 1.25rem 0.2rem 2.25rem;
-		background: var(--saffron);
-		color: var(--jet);
-		clip-path: polygon(0 0, 100% 0, 100% 100%, 18px 100%);
+		padding: 0.2rem 1.25rem 0.2rem calc(1.25rem + var(--strip-cut));
+		background: var(--strip-bg);
+		color: var(--strip-fg);
+		clip-path: polygon(0 0, 100% 0, 100% 100%, var(--strip-cut) 100%);
 	}
 
 	.who {
-		font-family: var(--font-display);
+		font-family: var(--brand-font);
 		font-weight: 700;
 		font-size: 0.7rem;
 		letter-spacing: 0.04em;
-		text-transform: uppercase;
+		text-transform: var(--brand-case);
 	}
 
 	.strip button {
 		min-height: 1.9rem;
 		padding: 0.15rem 0.7rem;
 		background: transparent;
-		border: 1.5px solid var(--jet);
-		color: var(--jet);
+		border: 1.5px solid currentColor;
+		color: inherit;
 		font-size: 0.78rem;
 		font-weight: 700;
 	}
 
 	.strip button:hover {
-		background: var(--jet);
-		color: var(--saffron);
+		background: var(--strip-hover-bg);
+		color: var(--strip-hover-fg);
+		border-color: var(--strip-hover-bg);
 	}
 
 	.bar {
@@ -97,20 +106,21 @@
 		display: flex;
 		align-items: center;
 		gap: 0.6rem;
-		font-family: var(--font-display);
-		font-weight: 900;
+		font-family: var(--brand-font);
+		font-weight: var(--brand-weight);
 		font-size: 1.15rem;
 		letter-spacing: 0.02em;
-		text-transform: uppercase;
-		color: var(--weiss);
+		text-transform: var(--brand-case);
+		color: inherit;
 		text-decoration: none;
 	}
 
 	.mark {
 		width: 0.85rem;
 		height: 1.35rem;
-		background: var(--weiss);
-		transform: skewX(-14deg);
+		background: var(--mark-bg);
+		border-radius: var(--mark-radius);
+		transform: skewX(var(--mark-skew));
 	}
 
 	nav {
@@ -119,22 +129,25 @@
 	}
 
 	nav a {
-		font-family: var(--font-display);
-		font-weight: 700;
-		font-size: 1rem;
+		font-family: var(--nav-font);
+		font-weight: var(--nav-weight);
+		font-size: var(--nav-size);
 		letter-spacing: 0.02em;
-		text-transform: uppercase;
-		color: var(--weiss);
+		text-transform: var(--nav-case);
+		color: inherit;
 		text-decoration: none;
-		text-shadow: 0 2px 0 rgb(0 0 0 / 0.25);
+		text-shadow: var(--nav-shadow);
+		padding: 0.2rem 0;
+		border-bottom: 2px solid transparent;
 	}
 
 	nav a:hover {
-		color: #ffe7a3;
+		color: var(--nav-hover);
 	}
 
 	nav a[aria-current='page'] {
-		color: var(--saffron);
+		color: var(--nav-active);
+		border-bottom-color: var(--nav-underline);
 	}
 
 	main {

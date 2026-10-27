@@ -10,7 +10,7 @@
 <section class="login">
 	<div class="intro">
 		<p class="eyebrow">{PUBLIC_CENTER_NAME}</p>
-		<h1>Log in<br /><span class="saffron">to book</span></h1>
+		<h1>Log in<br /><span class="accent-text">to book</span></h1>
 		<p class="muted">Use the same username and password you use at the center.</p>
 		<div class="hazard" aria-hidden="true"></div>
 	</div>
@@ -72,9 +72,9 @@
 		display: grid;
 		gap: 1.1rem;
 		padding: 1.75rem;
-		border-top: 4px solid var(--fire);
+		border-top: 4px solid var(--accent);
 		/* Angled lower-right corner, matching the site's cut panels. */
-		clip-path: polygon(0 0, 100% 0, 100% calc(100% - 22px), calc(100% - 22px) 100%, 0 100%);
+		clip-path: polygon(0 0, 100% 0, 100% calc(100% - var(--panel-cut)), calc(100% - var(--panel-cut)) 100%, 0 100%);
 	}
 
 	form button {

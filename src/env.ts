@@ -36,5 +36,10 @@ export const variables = defineEnvVars({
 		public: true,
 		description: 'Name shown in the page header.',
 		schema: (value) => optional(value) ?? 'Smartlaunch'
+	},
+	THEME: {
+		description:
+			'Folder name under src/themes to style the site with, e.g. "esportsnord". Falls back to "default" if unset or missing.',
+		schema: (value) => optional(value)?.trim()
 	}
 });

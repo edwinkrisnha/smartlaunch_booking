@@ -88,32 +88,34 @@
 		background: var(--surface);
 		border-radius: var(--radius);
 		overflow: hidden;
-		clip-path: polygon(0 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%);
+		border: var(--card-border);
+		box-shadow: var(--card-shadow);
+		clip-path: polygon(0 0, 100% 0, 100% calc(100% - var(--pass-cut) * 1.6), calc(100% - var(--pass-cut) * 1.6) 100%, 0 100%);
 	}
 
-	/* Rosewood stub with a dashed tear edge, matching the booking pass. */
+	/* Ticket stub with a dashed tear edge, matching the booking pass. */
 	.stub {
 		display: grid;
 		align-content: center;
 		gap: 0.35rem;
 		padding: 1.1rem;
-		background: var(--rosewood);
-		color: var(--weiss);
-		border-right: 2px dashed rgb(255 255 255 / 0.35);
+		background: var(--pass-bg);
+		color: var(--pass-fg);
+		border-right: 2px dashed var(--pass-tear);
 	}
 
 	.time {
 		font-family: var(--font-display);
-		font-weight: 900;
+		font-weight: var(--display-weight);
 		font-size: 1.9rem;
 		line-height: 1;
-		text-shadow: 0.06em 0.06em 0 var(--verdigris);
+		text-shadow: var(--headline-shadow);
 	}
 
 	.date {
 		font-size: 0.85rem;
 		font-weight: 600;
-		color: var(--saffron);
+		color: var(--pass-accent);
 	}
 
 	dl {
@@ -128,8 +130,9 @@
 	dt {
 		font-family: var(--font-sub);
 		font-size: 0.7rem;
-		letter-spacing: 0.05em;
-		text-transform: uppercase;
+		letter-spacing: var(--sub-spacing);
+		text-transform: var(--sub-case);
+		font-weight: var(--sub-weight);
 		color: var(--muted);
 		padding-top: 0.15rem;
 	}
@@ -159,7 +162,7 @@
 
 		.stub {
 			border-right: none;
-			border-bottom: 2px dashed rgb(255 255 255 / 0.35);
+			border-bottom: 2px dashed var(--pass-tear);
 			grid-auto-flow: column;
 			justify-content: space-between;
 			align-items: baseline;

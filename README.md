@@ -33,17 +33,49 @@ The pages are `/login`, `/` (book) and `/bookings` (my bookings).
 - **Duplicate protection.** Each confirm sends an `OrderCode`; the server ignores a second booking with the same code.
 - **Payments are out of scope.** Unlike the MVC client's flow, which goes through the payment providers and the Azure DB, this app writes the booking straight to the center server.
 
-## Design
+## Themes
 
-The look follows the eSports Nord landing page: a red header with a Saffron strip, slanted buttons and panel cuts, red hazard stripes, and white headlines with a Verdigris offset shadow. Colors are tokens at the top of `src/app.css`.
+The site's look comes from a theme in `src/themes/<name>/`. Pick one with `THEME=<name>` in `.env` (or in Cloudflare Pages). If `THEME` is unset or names a folder that doesn't exist, the `default` theme is used and the server logs a warning.
 
-| Role | Font | Source |
-| --- | --- | --- |
-| Headers | Unbounded, a free stand-in for INTEGRAL CF | Google Fonts |
-| Subheaders, labels, PC names | Zen Dots | Google Fonts |
-| Text | Montserrat | Google Fonts |
+| Theme | Look |
+| --- | --- |
+| `default` | Neutral: system fonts, blue accent, rounded corners; follows the visitor's light/dark setting |
+| `esportsnord` | eSports Nord brand: red header with a Saffron strip, slanted buttons and panel cuts, hazard stripes, Unbounded / Zen Dots / Montserrat fonts; dark only |
 
-To use the licensed INTEGRAL CF instead, put the font files in `static/fonts/`, add an `@font-face` for them in `src/app.css`, and put that family first in `--font-display`.
+A theme folder contains:
+
+- `theme.css` (required): sets the CSS variables for colours, fonts and shapes, and can add its own rules.
+- `favicon.svg` (optional): falls back to the default theme's icon.
+- Any images the CSS uses, referenced with relative `url(...)` paths.
+
+`src/themes/default/theme.css` defines every variable with comments, so it doubles as the reference. `src/app.css` and the pages contain only structure.
+
+### Making your own theme
+
+1. Create `src/themes/mytheme/theme.css`, starting from the default theme and overriding only what you want:
+
+   ```css
+   /* Web fonts, if any, must come first. */
+   @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap');
+   @import '../default/theme.css';
+
+   /* :root:root also beats the default theme's dark-mode block; use plain :root to keep it. */
+   :root:root {
+   	--font-display: 'Poppins', sans-serif;
+   	--font-body: 'Poppins', sans-serif;
+   	--accent: #e11d48;
+   	--accent-hover: #be123c;
+   	--seat-picked: var(--accent);
+   	--pass-bg: #4c0519;
+   }
+   ```
+
+2. Optionally add `src/themes/mytheme/favicon.svg`.
+3. Set `THEME=mytheme` and rebuild. Themes are bundled at build time, so a new or changed theme needs a new build and deploy.
+
+To customise an existing theme, copy its folder under a new name and edit that, so updates to the original don't overwrite your changes.
+
+The `esportsnord` theme uses Unbounded as a free stand-in for INTEGRAL CF. To use the licensed font, put the font files in the theme folder, add an `@font-face` for them in its `theme.css`, and put that family first in `--font-display`.
 
 ## Configuration
 
@@ -56,6 +88,7 @@ To use the licensed INTEGRAL CF instead, put the font files in `static/fonts/`, 
 | `CENTER_TIMEZONE` | no | Optional IANA zone (e.g. `Asia/Jakarta`); rejects past start times server-side |
 | `SL_LICENSE_EMAIL` | no | Optional; adds `?licenseemail=` for relay setups |
 | `PUBLIC_CENTER_NAME` | no | Name shown in the header |
+| `THEME` | no | Theme folder under `src/themes`; defaults to `default` (see [Themes](#themes)) |
 
 ### Reaching the center server from Cloudflare
 
