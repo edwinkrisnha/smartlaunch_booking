@@ -38,20 +38,29 @@ export async function listLayouts(): Promise<Layout[]> {
 	return groups.map((g) => ({ id: String(g.LayoutGroupID), name: g.Name }));
 }
 
-export async function listSeats(): Promise<Seat[]> {
-	const positions = await sl.getComputerLayoutPositions();
-	return positions.map((p) => ({
-		layoutId: String(p.LayoutGroupID),
-		computerId: String(p.ComputerID),
-		x: p.PosX,
-		y: p.PosY
-	}));
-}
-
 /** Only the fields a customer needs; the raw contract also exposes who is logged in where. */
 export async function listPcs(): Promise<Pc[]> {
 	const computers = await sl.getComputers();
 	return computers.map((c) => ({ id: String(c.ComputerID), name: c.Name, groupId: String(c.ComputerGroupID) }));
+}
+
+/**
+ * Layout positions of the given PCs. `/computerlayoutpositions` returns every
+ * row of the ComputerLayoutPositions table, including leftovers for computer
+ * IDs beyond the licensed client count (unlike `/computerpositions/{id}`, which
+ * filters on NumberOfClient), so keep only PCs that `/computers` knows about.
+ */
+export async function listSeats(pcs: Pc[] | Promise<Pc[]> = listPcs()): Promise<Seat[]> {
+	const [positions, known] = await Promise.all([sl.getComputerLayoutPositions(), pcs]);
+	const ids = new Set(known.map((pc) => pc.id));
+	return positions
+		.filter((p) => ids.has(String(p.ComputerID)))
+		.map((p) => ({
+			layoutId: String(p.LayoutGroupID),
+			computerId: String(p.ComputerID),
+			x: p.PosX,
+			y: p.PosY
+		}));
 }
 
 export class BookingError extends Error {

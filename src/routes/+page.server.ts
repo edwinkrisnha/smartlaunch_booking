@@ -3,7 +3,8 @@ import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async () => {
 	try {
-		const [layouts, seats, pcs] = await Promise.all([listLayouts(), listSeats(), listPcs()]);
+		const pcsRequest = listPcs();
+		const [layouts, seats, pcs] = await Promise.all([listLayouts(), listSeats(pcsRequest), pcsRequest]);
 		return { layouts, seats, pcs, loadError: null };
 	} catch (err) {
 		return { layouts: [], seats: [], pcs: [], loadError: toHttpError(err).message };
