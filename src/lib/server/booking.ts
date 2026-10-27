@@ -139,8 +139,12 @@ export function parseBookingRequest(input: unknown): BookingRequest {
 export async function createBooking(user: SessionUser, req: BookingRequest): Promise<{ orderCode: string }> {
 	const { from, to } = timeWindow(req.start, req.minutes);
 
-	if (CENTER_TIMEZONE && from < nowInZone(CENTER_TIMEZONE)) {
-		throw new BookingError('That time has already passed. Please pick a later start.');
+	// Bookings open from the next full hour in the center's time: at 14:20 the earliest start is 15:00.
+	if (CENTER_TIMEZONE) {
+		const earliest = Math.floor(nowInZone(CENTER_TIMEZONE) / 3600) * 3600 + 3600;
+		if (from < earliest) {
+			throw new BookingError(`The earliest arrival is ${formatLocal(earliest).slice(11)}. Please pick that time or later.`);
+		}
 	}
 
 	const ids = [...new Set(req.computerIds.map((id) => id.trim()))];

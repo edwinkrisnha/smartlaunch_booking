@@ -19,12 +19,22 @@
 	const pad = (n: number) => String(n).padStart(2, '0');
 	const toDateValue = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
-	const now = new Date();
-	const nextHour = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours() + 1);
-	const today = toDateValue(now);
+	// Bookings open from the next full hour: at 14:20 the earliest arrival is 15:00.
+	const nextFullHour = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours() + 1);
 
-	let date = $state(toDateValue(nextHour));
-	let time = $state(`${pad(nextHour.getHours())}:00`);
+	// Ticks so the limit moves on if the page stays open past the hour.
+	let now = $state(new Date());
+	$effect(() => {
+		const timer = setInterval(() => (now = new Date()), 30_000);
+		return () => clearInterval(timer);
+	});
+	const earliest = $derived(nextFullHour(now));
+	const earliestDate = $derived(toDateValue(earliest));
+	const earliestTime = $derived(`${pad(earliest.getHours())}:00`);
+
+	const initial = nextFullHour(new Date());
+	let date = $state(toDateValue(initial));
+	let time = $state(`${pad(initial.getHours())}:00`);
 	let hours = $state(2);
 	let layoutId = $state('');
 
@@ -32,7 +42,7 @@
 	const minutes = $derived(hours * 60);
 	const validInput = $derived(/^\d{4}-\d{2}-\d{2}$/.test(date) && /^\d{2}:\d{2}$/.test(time));
 	// `YYYY-MM-DDTHH:mm` without a zone parses as browser-local time, which is the center's time for its customers.
-	const inPast = $derived(validInput && new Date(start).getTime() < Date.now());
+	const tooEarly = $derived(validInput && new Date(start).getTime() < earliest.getTime());
 
 	const pcNames = $derived(new Map(data.pcs.map((pc) => [pc.id, pc.name || `PC ${pc.id}`])));
 	const nameOf = (id: string) => pcNames.get(id) ?? `PC ${id}`;
@@ -78,7 +88,7 @@
 		const s = start;
 		const m = minutes;
 		void refresh;
-		if (!validInput || inPast) {
+		if (!validInput || tooEarly) {
 			unavailable = new Set();
 			checking = false;
 			return;
@@ -116,7 +126,7 @@
 	}
 
 	const selectedIds = $derived([...selected].sort((a, b) => Number(a) - Number(b)));
-	const canBook = $derived(validInput && !inPast && !checking && !availabilityError && selected.size > 0);
+	const canBook = $derived(validInput && !tooEarly && !checking && !availabilityError && selected.size > 0);
 
 	let submitting = $state(false);
 	let result = $state<{ kind: 'success' | 'error'; text: string } | null>(null);
@@ -187,11 +197,17 @@
 			<div class="controls">
 				<label>
 					Date
-					<input type="date" bind:value={date} min={today} required />
+					<input type="date" bind:value={date} min={earliestDate} required />
 				</label>
 				<label>
 					Arrival time
-					<input type="time" bind:value={time} step="900" required />
+					<input
+						type="time"
+						bind:value={time}
+						step="900"
+						min={date === earliestDate ? earliestTime : undefined}
+						required
+					/>
 				</label>
 				<label>
 					Duration
@@ -204,8 +220,11 @@
 			</div>
 		</section>
 
-		{#if inPast}
-			<p class="notice error" role="alert">That time has already passed. Pick a later start.</p>
+		{#if tooEarly}
+			<p class="notice error" role="alert">
+				The earliest arrival is {earliestTime}
+				{earliestDate === toDateValue(now) ? 'today' : 'tomorrow'}. Pick that time or later.
+			</p>
 		{:else if availabilityError}
 			<p class="notice error" role="alert">{availabilityError}</p>
 		{/if}
@@ -326,7 +345,7 @@
 		class:taken
 		class:picked
 		{style}
-		disabled={taken || inPast || !validInput}
+		disabled={taken || tooEarly || !validInput}
 		aria-pressed={picked}
 		aria-label={taken ? `${describe(id)}, unavailable` : describe(id)}
 		title={taken ? `${describe(id)} is not available` : describe(id)}
