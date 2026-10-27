@@ -9,7 +9,7 @@
 	/** Our API endpoints answer either the payload or `{ error }`. */
 	type ApiResponse<T> = Partial<T> & { error?: string };
 
-	const TILE = { width: 62, height: 44, gapX: 4, gapY: 8 };
+	const TILE = { width: 66, height: 44, gapX: 4, gapY: 8 };
 	const PADDING = 16;
 	/** Shrink a wide room to fit its card, but not so far that PC names become unreadable. */
 	const MIN_ZOOM = 0.75;
@@ -175,7 +175,7 @@
 </section>
 
 {#if data.loadError}
-	<p class="notice error" role="alert">{data.loadError}</p>
+	<p class="notice error page-error" role="alert">{data.loadError}</p>
 {:else}
 	<div class="steps" style:padding-bottom="{barHeight + 24}px">
 		<section class="card" aria-labelledby="when-title">
@@ -206,7 +206,7 @@
 			<p class="notice error" role="alert">{availabilityError}</p>
 		{/if}
 
-		<section class="card" aria-labelledby="seats-title">
+		<section class="card picker" aria-labelledby="seats-title">
 			<div class="map-head">
 				<h2 id="seats-title"><span class="step">2</span>Pick your PCs</h2>
 				<ul class="legend" aria-label="Legend">
@@ -329,6 +329,15 @@
 {/snippet}
 
 <style>
+	/* The page spans the screen; everything except the PC picker keeps the site's 1200px column. */
+	.intro,
+	.page-error,
+	.steps > :not(.picker) {
+		width: 100%;
+		max-width: 1168px;
+		margin-inline: auto;
+	}
+
 	.intro {
 		display: grid;
 		gap: 0.75rem;
@@ -492,7 +501,7 @@
 	}
 
 	.map .seat-name {
-		font-size: 0.68rem;
+		font-size: 0.74rem;
 		letter-spacing: 0;
 	}
 

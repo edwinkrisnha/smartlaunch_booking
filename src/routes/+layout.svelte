@@ -31,7 +31,8 @@
 	</div>
 </header>
 
-<main>
+<!-- The booking page lets its PC map use the full screen width and centres its other sections itself. -->
+<main class:wide={page.url.pathname === '/'}>
 	{@render children()}
 </main>
 
@@ -140,6 +141,10 @@
 		max-width: 1200px;
 		margin: 0 auto;
 		padding: 2.5rem 1rem 4rem;
+	}
+
+	main.wide {
+		max-width: none;
 	}
 
 	@media (max-width: 640px) {
