@@ -58,6 +58,8 @@
 	});
 
 	let floorWidth = $state(0);
+	/** Height of the docked booking bar; the page reserves that much space below the map. */
+	let barHeight = $state(0);
 	const zoom = $derived(
 		floorWidth && map.width > floorWidth ? Math.max(MIN_ZOOM, floorWidth / map.width) : 1
 	);
@@ -155,13 +157,14 @@
 		}
 	}
 
-	const dateLabel = $derived(
+	const formatDate = (style: 'long' | 'short') =>
 		validInput
-			? new Intl.DateTimeFormat(undefined, { weekday: 'long', day: 'numeric', month: 'long' }).format(
+			? new Intl.DateTimeFormat(undefined, { weekday: style, day: 'numeric', month: style }).format(
 					new Date(`${date}T00:00`)
 				)
-			: '—'
-	);
+			: '—';
+	const dateLabel = $derived(formatDate('long'));
+	const dateLabelShort = $derived(formatDate('short'));
 </script>
 
 <section class="intro">
@@ -174,125 +177,135 @@
 {#if data.loadError}
 	<p class="notice error" role="alert">{data.loadError}</p>
 {:else}
-	<div class="grid">
-		<div class="main">
-			<section class="card" aria-labelledby="when-title">
-				<h2 id="when-title"><span class="step">1</span>When</h2>
-				<div class="controls">
-					<label>
-						Date
-						<input type="date" bind:value={date} min={today} required />
-					</label>
-					<label>
-						Arrival time
-						<input type="time" bind:value={time} step="900" required />
-					</label>
-					<label>
-						Duration
-						<select bind:value={hours}>
-							{#each HOUR_OPTIONS as h (h)}
-								<option value={h}>{h} {h === 1 ? 'hour' : 'hours'}</option>
-							{/each}
-						</select>
-					</label>
-				</div>
-			</section>
-
-			{#if inPast}
-				<p class="notice error" role="alert">That time has already passed. Pick a later start.</p>
-			{:else if availabilityError}
-				<p class="notice error" role="alert">{availabilityError}</p>
-			{/if}
-
-			<section class="card" aria-labelledby="seats-title">
-				<div class="map-head">
-					<h2 id="seats-title"><span class="step">2</span>Pick your PCs</h2>
-					<ul class="legend" aria-label="Legend">
-						<li><span class="swatch free"></span>Available</li>
-						<li><span class="swatch picked"></span>Selected</li>
-						<li><span class="swatch taken"></span>Unavailable</li>
-					</ul>
-				</div>
-
-				{#if layouts.length > 1}
-					<div class="tabs" role="tablist" aria-label="Area">
-						{#each layouts as layout (layout.id)}
-							<button
-								type="button"
-								role="tab"
-								aria-selected={layout.id === activeLayoutId}
-								onclick={() => (layoutId = layout.id)}>{layout.name}</button
-							>
+	<div class="steps" style:padding-bottom="{barHeight + 24}px">
+		<section class="card" aria-labelledby="when-title">
+			<h2 id="when-title"><span class="step">1</span>When</h2>
+			<div class="controls">
+				<label>
+					Date
+					<input type="date" bind:value={date} min={today} required />
+				</label>
+				<label>
+					Arrival time
+					<input type="time" bind:value={time} step="900" required />
+				</label>
+				<label>
+					Duration
+					<select bind:value={hours}>
+						{#each HOUR_OPTIONS as h (h)}
+							<option value={h}>{h} {h === 1 ? 'hour' : 'hours'}</option>
 						{/each}
-					</div>
-				{:else if layouts.length === 1}
-					<p class="area">{layouts[0].name}</p>
-				{/if}
+					</select>
+				</label>
+			</div>
+		</section>
 
-				<div class="floor" aria-busy={checking} bind:clientWidth={floorWidth}>
-					{#if map.seats.length > 0}
-						<!-- Outer box takes the zoomed size so the floor scrolls exactly as far as needed. -->
-						<div style:width="{map.width * zoom}px" style:height="{map.height * zoom}px">
-							<div
-								class="map"
-								style:width="{map.width}px"
-								style:height="{map.height}px"
-								style:transform={zoom === 1 ? undefined : `scale(${zoom})`}
-								style:--seat-w="{TILE.width}px"
-								style:--seat-h="{TILE.height}px"
-							>
-								{#each map.seats as seat (seat.id)}
-									{@render seatButton(seat.id, `left:${seat.left}px;top:${seat.top}px`)}
-								{/each}
-							</div>
-						</div>
-					{:else if data.pcs.length > 0}
-						<div class="list">
-							{#each data.pcs as pc (pc.id)}
-								{@render seatButton(pc.id, '')}
-							{/each}
-						</div>
-					{:else}
-						<p class="empty">No PCs are set up for booking yet.</p>
-					{/if}
-				</div>
-			</section>
-		</div>
+		{#if inPast}
+			<p class="notice error" role="alert">That time has already passed. Pick a later start.</p>
+		{:else if availabilityError}
+			<p class="notice error" role="alert">{availabilityError}</p>
+		{/if}
 
-		<aside class="pass" aria-labelledby="pass-title">
-			<div class="pass-head">
-				<p class="eyebrow" id="pass-title"><span class="step">3</span>Booking pass</p>
-				<p class="pass-time">{validInput ? time : '--:--'}</p>
-				<p class="pass-date">{dateLabel}</p>
+		<section class="card" aria-labelledby="seats-title">
+			<div class="map-head">
+				<h2 id="seats-title"><span class="step">2</span>Pick your PCs</h2>
+				<ul class="legend" aria-label="Legend">
+					<li><span class="swatch free"></span>Available</li>
+					<li><span class="swatch picked"></span>Selected</li>
+					<li><span class="swatch taken"></span>Unavailable</li>
+				</ul>
 			</div>
 
-			<div class="perforation" aria-hidden="true"></div>
+			{#if layouts.length > 1}
+				<div class="tabs" role="tablist" aria-label="Area">
+					{#each layouts as layout (layout.id)}
+						<button
+							type="button"
+							role="tab"
+							aria-selected={layout.id === activeLayoutId}
+							onclick={() => (layoutId = layout.id)}>{layout.name}</button
+						>
+					{/each}
+				</div>
+			{:else if layouts.length === 1}
+				<p class="area">{layouts[0].name}</p>
+			{/if}
 
-			<div class="pass-body">
-				<dl>
-					<dt>Duration</dt>
-					<dd>{hours} {hours === 1 ? 'hour' : 'hours'}</dd>
-					<dt>PCs</dt>
-					<dd>{selectedIds.length ? selectedIds.map(nameOf).join(', ') : 'None selected'}</dd>
+			<div class="floor" aria-busy={checking} bind:clientWidth={floorWidth}>
+				{#if map.seats.length > 0}
+					<!-- Outer box takes the zoomed size so the floor scrolls exactly as far as needed. -->
+					<div style:width="{map.width * zoom}px" style:height="{map.height * zoom}px">
+						<div
+							class="map"
+							style:width="{map.width}px"
+							style:height="{map.height}px"
+							style:transform={zoom === 1 ? undefined : `scale(${zoom})`}
+							style:--seat-w="{TILE.width}px"
+							style:--seat-h="{TILE.height}px"
+						>
+							{#each map.seats as seat (seat.id)}
+								{@render seatButton(seat.id, `left:${seat.left}px;top:${seat.top}px`)}
+							{/each}
+						</div>
+					</div>
+				{:else if data.pcs.length > 0}
+					<div class="list">
+						{#each data.pcs as pc (pc.id)}
+							{@render seatButton(pc.id, '')}
+						{/each}
+					</div>
+				{:else}
+					<p class="empty">No PCs are set up for booking yet.</p>
+				{/if}
+			</div>
+		</section>
+	</div>
+
+	<!-- Booking pass, docked to the bottom of the screen so it stays in reach while picking PCs. -->
+	<section class="pass-bar" aria-labelledby="pass-title" bind:clientHeight={barHeight}>
+		<div class="pass-inner">
+			{#if result}
+				<p class="notice {result.kind}" role={result.kind === 'error' ? 'alert' : 'status'}>
+					{result.text}
+					{#if result.kind === 'success'}<a href="/bookings">View my bookings</a>{/if}
+				</p>
+			{/if}
+
+			<div class="pass-row">
+				<div class="stub">
+					<p class="eyebrow" id="pass-title"><span class="step">3</span>Booking pass</p>
+					<p class="stub-when">
+						<span class="pass-time">{validInput ? time : '--:--'}</span>
+						<span class="pass-date long">{dateLabel}</span>
+						<span class="pass-date short">{dateLabelShort}</span>
+					</p>
+				</div>
+
+				<dl class="facts">
+					<div>
+						<dt>Duration</dt>
+						<dd>{hours} {hours === 1 ? 'hour' : 'hours'}</dd>
+					</div>
+					<div class="pcs">
+						<dt>PCs</dt>
+						<dd title={selectedIds.map(nameOf).join(', ')}>
+							{selectedIds.length ? selectedIds.map(nameOf).join(', ') : 'None selected'}
+						</dd>
+					</div>
 					{#if selectedIds.length > 1}
-						<dt>Total PC time</dt>
-						<dd class="total">{selectedIds.length * hours} hours</dd>
+						<div>
+							<dt>Total PC time</dt>
+							<dd class="total">{selectedIds.length * hours} hours</dd>
+						</div>
 					{/if}
 				</dl>
-
-				{#if result}
-					<p class="notice {result.kind}" role={result.kind === 'error' ? 'alert' : 'status'}>
-						{result.text}
-						{#if result.kind === 'success'}<a href="/bookings">View my bookings</a>{/if}
-					</p>
-				{/if}
 
 				<button class="primary" type="button" disabled={!canBook || submitting} onclick={confirm}>
 					{submitting ? 'Booking…' : checking ? 'Checking…' : 'Confirm booking'}
 				</button>
 			</div>
-		</aside>
-	</div>
+		</div>
+	</section>
 {/if}
 
 {#snippet seatButton(id: string, style: string)}
@@ -331,19 +344,11 @@
 		font-size: 1.05rem;
 	}
 
-	.grid {
-		display: grid;
-		grid-template-columns: minmax(0, 1fr) 320px;
-		gap: 1.5rem;
-		align-items: start;
-	}
-
-	.main {
+	.steps {
 		display: grid;
 		/* Let the seat map scroll inside its card instead of widening the page. */
 		grid-template-columns: minmax(0, 1fr);
 		gap: 1.25rem;
-		min-width: 0;
 	}
 
 	h2 {
@@ -370,6 +375,7 @@
 		grid-template-columns: repeat(3, minmax(0, 1fr));
 		gap: 1rem;
 		margin-top: 1rem;
+		max-width: 760px;
 	}
 
 	.map-head {
@@ -571,97 +577,119 @@
 		text-decoration: line-through;
 	}
 
-	/* Booking pass: the ticket you are about to take. */
-	.pass {
-		--notch: 11px;
-		position: sticky;
-		top: 1.25rem;
-		filter: drop-shadow(0 10px 24px rgb(0 0 0 / 0.25));
+	/* Booking pass, docked to the bottom of the viewport. */
+	.pass-bar {
+		position: fixed;
+		inset: auto 0 0;
+		z-index: 10;
+		background: var(--jet);
+		border-top: 3px solid var(--fire);
+		box-shadow: 0 -12px 32px rgb(0 0 0 / 0.45);
 	}
 
-	.pass-head {
+	.pass-inner {
+		display: grid;
+		gap: 0.75rem;
+		max-width: 1200px;
+		margin: 0 auto;
+		padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom));
+	}
+
+	.pass-inner .notice a {
+		margin-left: 0.5rem;
+	}
+
+	.pass-row {
+		display: grid;
+		grid-template-columns: auto minmax(0, 1fr) auto;
+		align-items: center;
+		gap: 1.5rem;
+	}
+
+	/* Ticket stub with a dashed tear line on its trailing edge. */
+	.stub {
+		display: grid;
+		gap: 0.35rem;
+		padding: 0.6rem 1.4rem 0.6rem 0.9rem;
+		margin: -0.15rem 0;
 		background: var(--rosewood);
 		color: var(--weiss);
-		padding: 1.25rem 1.25rem 1.1rem;
-		border-radius: var(--radius) var(--radius) 0 0;
+		border-right: 2px dashed rgb(255 255 255 / 0.4);
+		clip-path: polygon(0 0, 100% 0, 100% 100%, 10px 100%, 0 calc(100% - 10px));
 	}
 
-	.pass-head .eyebrow {
+	.stub .eyebrow {
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
 		margin: 0;
-		color: var(--saffron);
+		font-size: 0.68rem;
+	}
+
+	.stub .step {
+		width: 1.6rem;
+		height: 1.3rem;
+		font-size: 0.65rem;
+	}
+
+	.stub-when {
+		display: flex;
+		align-items: baseline;
+		gap: 0.75rem;
+		margin: 0;
 	}
 
 	.pass-time {
-		margin: 0.6rem 0 0;
 		font-family: var(--font-display);
 		font-weight: 900;
-		font-size: 2.6rem;
+		font-size: 1.9rem;
 		line-height: 1;
 		letter-spacing: -0.01em;
 		text-shadow: 0.06em 0.06em 0 var(--verdigris);
 	}
 
 	.pass-date {
-		margin: 0.35rem 0 0;
 		font-weight: 600;
+		font-size: 0.9rem;
 		opacity: 0.85;
+		white-space: nowrap;
 	}
 
-	/* Tear line with half-circle notches cut out of both edges. */
-	.perforation {
-		position: relative;
-		height: calc(var(--notch) * 2);
-		background:
-			linear-gradient(var(--surface), var(--surface)) bottom / 100% 50% no-repeat,
-			linear-gradient(var(--rosewood), var(--rosewood)) top / 100% 50% no-repeat;
-		-webkit-mask:
-			radial-gradient(circle var(--notch) at 0 50%, transparent 98%, #000) left / 51% 100% no-repeat,
-			radial-gradient(circle var(--notch) at 100% 50%, transparent 98%, #000) right / 51% 100% no-repeat;
-		mask:
-			radial-gradient(circle var(--notch) at 0 50%, transparent 98%, #000) left / 51% 100% no-repeat,
-			radial-gradient(circle var(--notch) at 100% 50%, transparent 98%, #000) right / 51% 100% no-repeat;
+	.pass-date.short {
+		display: none;
 	}
 
-	.perforation::after {
-		content: '';
-		position: absolute;
-		left: calc(var(--notch) + 6px);
-		right: calc(var(--notch) + 6px);
-		top: 50%;
-		border-top: 2px dashed var(--border);
-	}
-
-	.pass-body {
-		display: grid;
-		gap: 1rem;
-		background: var(--surface);
-		padding: 0.6rem 1.25rem 1.25rem;
-		border-radius: 0 0 var(--radius) var(--radius);
-	}
-
-	dl {
-		display: grid;
-		grid-template-columns: auto 1fr;
-		gap: 0.6rem 1rem;
+	.facts {
+		display: flex;
+		gap: 0.5rem 2rem;
 		margin: 0;
+		min-width: 0;
+	}
+
+	.facts > div {
+		display: grid;
+		gap: 0.15rem;
+		min-width: 0;
+	}
+
+	.facts .pcs {
+		flex: 1;
 	}
 
 	dt {
 		font-family: var(--font-sub);
-		font-size: 0.7rem;
+		font-size: 0.66rem;
 		letter-spacing: 0.05em;
 		text-transform: uppercase;
 		color: var(--muted);
-		padding-top: 0.15rem;
 	}
 
 	dd {
 		margin: 0;
 		font-weight: 600;
-		overflow-wrap: anywhere;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
 	dd.total {
@@ -669,18 +697,24 @@
 		font-weight: 700;
 	}
 
-	.pass-body .notice a {
-		display: block;
-		margin-top: 0.4rem;
+	.pass-row .primary {
+		min-width: 15rem;
 	}
 
-	@media (max-width: 920px) {
-		.grid {
-			grid-template-columns: minmax(0, 1fr);
+	@media (max-width: 860px) {
+		.pass-row {
+			grid-template-columns: minmax(0, 1fr) auto;
+			gap: 0.75rem 1rem;
 		}
 
-		.pass {
-			position: static;
+		.facts {
+			grid-column: 1 / -1;
+			grid-row: 2;
+			gap: 0.25rem 1.25rem;
+		}
+
+		.pass-row .primary {
+			min-width: 0;
 		}
 	}
 
@@ -691,6 +725,48 @@
 
 		.controls label:last-child {
 			grid-column: 1 / -1;
+		}
+
+		.stub {
+			padding-right: 1rem;
+		}
+
+		.stub .eyebrow {
+			display: none;
+		}
+
+		.stub-when {
+			flex-direction: column;
+			gap: 0.25rem;
+		}
+
+		.pass-time {
+			font-size: 1.5rem;
+		}
+
+		.pass-date {
+			font-size: 0.78rem;
+		}
+
+		.pass-date.long {
+			display: none;
+		}
+
+		.pass-date.short {
+			display: inline;
+		}
+
+		.pass-row .primary {
+			padding-left: 1rem;
+			font-size: 0.75rem;
+		}
+
+		.facts dt {
+			font-size: 0.6rem;
+		}
+
+		.facts dd {
+			font-size: 0.85rem;
 		}
 	}
 </style>
