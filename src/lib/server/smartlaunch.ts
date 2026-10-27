@@ -30,6 +30,8 @@ export interface RawComputer {
 	ComputerID: string;
 	ComputerGroupID: string;
 	Name: string;
+	/** Lists.Consoles.Types name: "Disabled" for a PC, otherwise "Playstation", "XBox", "Nintendo", ... */
+	ConsoleType: string;
 }
 
 export interface RawLayoutGroup {

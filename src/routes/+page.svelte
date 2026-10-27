@@ -36,6 +36,9 @@
 
 	const pcNames = $derived(new Map(data.pcs.map((pc) => [pc.id, pc.name || `PC ${pc.id}`])));
 	const nameOf = (id: string) => pcNames.get(id) ?? `PC ${id}`;
+	const consoles = $derived(new Map(data.pcs.filter((pc) => pc.console).map((pc) => [pc.id, pc.console!])));
+	/** Name plus console type, for tooltips and screen readers. */
+	const describe = (id: string) => (consoles.has(id) ? `${nameOf(id)}, ${consoles.get(id)}` : nameOf(id));
 
 	const layouts = $derived(data.layouts.filter((l) => data.seats.some((s) => s.layoutId === l.id)));
 	const activeLayoutId = $derived(layouts.some((l) => l.id === layoutId) ? layoutId : (layouts[0]?.id ?? ''));
@@ -214,6 +217,10 @@
 					<li><span class="swatch free"></span>Available</li>
 					<li><span class="swatch picked"></span>Selected</li>
 					<li><span class="swatch taken"></span>Unavailable</li>
+					{#if consoles.size > 0}
+						<li class="kind"><span class="screen" aria-hidden="true"></span>PC</li>
+						<li class="kind">{@render gamepad()}Console</li>
+					{/if}
 				</ul>
 			</div>
 
@@ -320,13 +327,27 @@
 		{style}
 		disabled={taken || inPast || !validInput}
 		aria-pressed={picked}
-		aria-label={taken ? `${nameOf(id)}, unavailable` : nameOf(id)}
-		title={taken ? `${nameOf(id)} is not available` : nameOf(id)}
+		aria-label={taken ? `${describe(id)}, unavailable` : describe(id)}
+		title={taken ? `${describe(id)} is not available` : describe(id)}
 		onclick={() => toggle(id)}
 	>
-		<span class="screen" aria-hidden="true"></span>
+		{#if consoles.has(id)}
+			{@render gamepad()}
+		{:else}
+			<span class="screen" aria-hidden="true"></span>
+		{/if}
 		<span class="seat-name">{id}</span>
 	</button>
+{/snippet}
+
+<!-- Consoles get a gamepad where PCs show a monitor bar; both take the tile's status colour. -->
+{#snippet gamepad()}
+	<svg class="pad" viewBox="0 0 24 16" aria-hidden="true">
+		<path
+			fill-rule="evenodd"
+			d="M7 2h10a6 6 0 0 1 5.8 7.5l-.9 3.6a2.5 2.5 0 0 1-4.3 1.1L15 11.5H9l-2.6 2.7a2.5 2.5 0 0 1-4.3-1.1l-.9-3.6A6 6 0 0 1 7 2zM6 5.5h1.5V7H9v1.5H7.5V10H6V8.5H4.5V7H6zm10.5.7a1 1 0 1 0 0 2 1 1 0 0 0 0-2zm2.3 2.2a1 1 0 1 0 0 2 1 1 0 0 0 0-2z"
+		/>
+	</svg>
 {/snippet}
 
 <style>
@@ -539,6 +560,17 @@
 		background: var(--free);
 	}
 
+	.pad {
+		width: 16px;
+		height: 11px;
+		fill: var(--free);
+		flex: none;
+	}
+
+	.legend .kind .screen {
+		width: 0.95rem;
+	}
+
 	.seat-name {
 		max-width: 100%;
 		overflow: hidden;
@@ -566,6 +598,10 @@
 		background: var(--saffron);
 	}
 
+	.seat.picked .pad {
+		fill: var(--saffron);
+	}
+
 	.seat.picked:not(:disabled):hover {
 		background: var(--fire-hover);
 	}
@@ -581,6 +617,10 @@
 
 	.seat.taken .screen {
 		background: var(--rosewood);
+	}
+
+	.seat.taken .pad {
+		fill: var(--rosewood);
 	}
 
 	.seat.taken .seat-name {

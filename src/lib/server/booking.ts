@@ -41,7 +41,12 @@ export async function listLayouts(): Promise<Layout[]> {
 /** Only the fields a customer needs; the raw contract also exposes who is logged in where. */
 export async function listPcs(): Promise<Pc[]> {
 	const computers = await sl.getComputers();
-	return computers.map((c) => ({ id: String(c.ComputerID), name: c.Name, groupId: String(c.ComputerGroupID) }));
+	return computers.map((c) => ({
+		id: String(c.ComputerID),
+		name: c.Name,
+		groupId: String(c.ComputerGroupID),
+		console: c.ConsoleType && c.ConsoleType !== 'Disabled' ? c.ConsoleType : null
+	}));
 }
 
 /**

@@ -17,6 +17,8 @@ export interface Pc {
 	id: string;
 	name: string;
 	groupId: string;
+	/** Console type (e.g. "Playstation"), or null for a regular PC. */
+	console: string | null;
 }
 
 export interface Seat {
