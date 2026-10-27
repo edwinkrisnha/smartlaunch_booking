@@ -120,12 +120,17 @@ async function request<T>(
 		throw new SmartlaunchError('The center server could not be reached. Please try again later.');
 	}
 
+	const text = await res.text();
+
 	if (res.status === 401 || res.status === 403) {
-		console.error(`Smartlaunch ${method} ${path}: API credentials rejected (${res.status})`);
+		// Cloudflare itself answers 403 "error code: 1003" when a Worker fetches a bare IP address.
+		const reason = /error code:\s*1003/i.test(text)
+			? 'SL_API_URL is an IP address, which Cloudflare blocks (error 1003). Use a hostname, e.g. a Cloudflare Tunnel.'
+			: `API credentials rejected (${res.status}); check SL_API_USERNAME / SL_API_PASSWORD.`;
+		console.error(`Smartlaunch ${method} ${path}: ${reason}`);
 		throw new SmartlaunchError('The booking service is misconfigured. Please contact the center.');
 	}
 
-	const text = await res.text();
 	if (res.status === 404 && notFoundAsNull) return null as T;
 	if (!res.ok) {
 		console.error(`Smartlaunch ${method} ${path}: HTTP ${res.status}`, text.slice(0, 500));

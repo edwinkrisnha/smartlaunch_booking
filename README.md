@@ -149,7 +149,7 @@ npm run gen                 # regenerate worker-configuration.d.ts after editing
 
 | Message | Cause |
 | --- | --- |
-| "The booking service is misconfigured" | The server rejected `SL_API_USERNAME` / `SL_API_PASSWORD` |
+| "The booking service is misconfigured" | On Cloudflare with an IP address in `SL_API_URL`: Cloudflare blocks requests to bare IPs (error 1003); use a hostname. Otherwise the server rejected `SL_API_USERNAME` / `SL_API_PASSWORD`. The Cloudflare logs say which. |
 | "The center server could not be reached" | `SL_API_URL` is wrong, the server is down, or a firewall blocks the port |
 | `SESSION_SECRET must be set…` in the console | `SESSION_SECRET` is missing or shorter than 32 characters |
 | Works locally, fails after deploy | `SL_API_URL` is a LAN or bare IP address; see *Reaching the center server from Cloudflare* |
