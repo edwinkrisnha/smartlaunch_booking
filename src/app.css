@@ -1,38 +1,37 @@
+/* Brand palette (eSports Nord) */
 :root {
-	--bg: #0e1116;
-	--surface: #161b22;
-	--surface-2: #1d2430;
-	--border: #2a3341;
-	--text: #e6edf3;
-	--muted: #8b98a8;
-	--accent: #3dd68c;
-	--accent-ink: #062615;
-	--danger: #ff6b6b;
-	--danger-bg: #3a1618;
-	--success-bg: #10301f;
-	--seat-free: #223041;
-	--seat-taken: #2a1d22;
-	--radius: 10px;
-	color-scheme: dark;
-}
+	--fire: #cf2528;
+	--fire-hover: #e0393c;
+	--jet: #363436;
+	--weiss: #ffffff;
+	--rosewood: #631011;
+	--saffron: #f6c233;
+	--verdigris: #409d9d;
 
-@media (prefers-color-scheme: light) {
-	:root {
-		--bg: #f4f6f9;
-		--surface: #ffffff;
-		--surface-2: #eef1f5;
-		--border: #d5dbe3;
-		--text: #17202b;
-		--muted: #5c6a7a;
-		--accent: #13995a;
-		--accent-ink: #ffffff;
-		--danger: #c62828;
-		--danger-bg: #fdecec;
-		--success-bg: #e3f6ec;
-		--seat-free: #e6edf5;
-		--seat-taken: #f6e3e6;
-		color-scheme: light;
-	}
+	--font-display: 'Unbounded', 'Arial Black', sans-serif;
+	--font-sub: 'Zen Dots', 'Unbounded', sans-serif;
+	--font-body: 'Montserrat', system-ui, sans-serif;
+
+	/* Dark only, like the landing page: near-black floor, Jet panels. */
+	--bg: #121112;
+	--surface: var(--jet);
+	--surface-2: #434043;
+	--border: #4d4a4d;
+	--text: var(--weiss);
+	--muted: #bdb9bc;
+	--accent: var(--fire);
+	--focus: var(--saffron);
+	--highlight: var(--saffron);
+	--free: var(--verdigris);
+	--danger: #ff8a8c;
+	--danger-bg: rgb(207 37 40 / 0.16);
+	--success: #7fd3d3;
+	--success-bg: rgb(64 157 157 / 0.18);
+	--grid-dot: rgb(255 255 255 / 0.07);
+	--radius: 2px;
+	/* Slant used for buttons, badges and section cuts. */
+	--cut: 14px;
+	color-scheme: dark;
 }
 
 * {
@@ -42,26 +41,68 @@
 html,
 body {
 	margin: 0;
-	background: var(--bg);
 	color: var(--text);
-	font: 15px/1.5 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+	font: 500 15px/1.6 var(--font-body);
+	-webkit-font-smoothing: antialiased;
+}
+
+/* Faint scratched-metal texture, echoing the landing page backgrounds. */
+body {
+	min-height: 100vh;
+	background-color: var(--bg);
+	background-image:
+		repeating-linear-gradient(117deg, rgb(255 255 255 / 0.018) 0 1px, transparent 1px 23px),
+		repeating-linear-gradient(32deg, rgb(255 255 255 / 0.014) 0 1px, transparent 1px 37px),
+		repeating-linear-gradient(-71deg, rgb(255 255 255 / 0.012) 0 1px, transparent 1px 51px);
 }
 
 a {
-	color: var(--accent);
+	color: inherit;
+	text-decoration-color: var(--accent);
+	text-decoration-thickness: 2px;
+	text-underline-offset: 3px;
 }
 
-h1,
+h1 {
+	font-family: var(--font-display);
+	font-weight: 900;
+	font-size: clamp(2.2rem, 6vw, 4rem);
+	line-height: 0.95;
+	letter-spacing: -0.01em;
+	text-transform: uppercase;
+	margin: 0;
+	/* Hard Verdigris offset, as on the landing page heroes. */
+	text-shadow: 0.06em 0.06em 0 var(--verdigris);
+}
+
+/* Saffron display text, for the second line of a headline. */
+.saffron {
+	color: var(--saffron);
+	text-shadow: none;
+}
+
 h2,
-h3 {
-	line-height: 1.2;
-	margin: 0 0 0.5rem;
+.eyebrow {
+	font-family: var(--font-sub);
+	font-weight: 400;
+	font-size: 0.95rem;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	margin: 0;
+}
+
+.eyebrow {
+	color: var(--saffron);
+	font-size: 0.8rem;
 }
 
 label {
 	display: grid;
-	gap: 0.3rem;
-	font-size: 0.85rem;
+	gap: 0.35rem;
+	font-family: var(--font-sub);
+	font-size: 0.72rem;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
 	color: var(--muted);
 }
 
@@ -73,54 +114,112 @@ button {
 
 input,
 select {
-	background: var(--surface-2);
+	font-family: var(--font-body);
+	font-weight: 600;
+	font-size: 1rem;
+	letter-spacing: normal;
+	text-transform: none;
+	background: var(--bg);
 	color: var(--text);
 	border: 1px solid var(--border);
-	border-radius: 8px;
-	padding: 0.55rem 0.7rem;
-	min-height: 2.5rem;
+	border-bottom: 2px solid var(--border);
+	border-radius: var(--radius);
+	padding: 0.6rem 0.75rem;
+	min-height: 2.75rem;
+	/* Date/time inputs have a wide intrinsic size that would overflow narrow grids. */
+	width: 100%;
+	min-width: 0;
 }
 
-input:focus-visible,
-select:focus-visible,
-button:focus-visible {
-	outline: 2px solid var(--accent);
+label {
+	min-width: 0;
+}
+
+input:hover,
+select:hover {
+	border-bottom-color: var(--muted);
+}
+
+input:focus,
+select:focus {
+	border-bottom-color: var(--saffron);
+}
+
+:focus-visible {
+	outline: 2px solid var(--focus);
 	outline-offset: 2px;
 }
 
 button {
 	cursor: pointer;
-	border-radius: 8px;
+	border-radius: var(--radius);
 	border: 1px solid var(--border);
 	background: var(--surface-2);
 	color: var(--text);
-	padding: 0.55rem 1rem;
-	min-height: 2.5rem;
+	font-weight: 600;
+	padding: 0.6rem 1rem;
+	min-height: 2.75rem;
+	transition:
+		background-color 0.15s,
+		border-color 0.15s,
+		transform 0.1s;
 }
 
-button.primary {
-	background: var(--accent);
-	border-color: var(--accent);
-	color: var(--accent-ink);
-	font-weight: 600;
+button:not(:disabled):active {
+	transform: translateY(1px);
+}
+
+/* Red call to action with a slanted trailing edge. */
+button.primary,
+.cta {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 3.25rem;
+	padding: 0 calc(1.4rem + var(--cut)) 0 1.4rem;
+	border: none;
+	border-radius: 0;
+	background: var(--fire);
+	color: var(--weiss);
+	font-family: var(--font-display);
+	font-weight: 700;
+	font-size: 0.85rem;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	text-decoration: none;
+	clip-path: polygon(0 0, 100% 0, calc(100% - var(--cut)) 100%, 0 100%);
+}
+
+button.primary:not(:disabled):hover,
+.cta:hover {
+	background: var(--fire-hover);
 }
 
 button:disabled {
-	opacity: 0.5;
+	opacity: 0.45;
 	cursor: not-allowed;
 }
 
 .card {
 	background: var(--surface);
-	border: 1px solid var(--border);
 	border-radius: var(--radius);
 	padding: 1.25rem;
 }
 
+/* Red hazard stripes, as used on the landing page. */
+.hazard {
+	height: 14px;
+	width: min(260px, 60%);
+	background: repeating-linear-gradient(-55deg, var(--fire) 0 12px, transparent 12px 24px);
+	mask: linear-gradient(90deg, #000 40%, transparent);
+}
+
 .notice {
-	border-radius: 8px;
-	padding: 0.7rem 0.9rem;
-	margin: 0 0 1rem;
+	border-radius: var(--radius);
+	border-left: 4px solid currentColor;
+	padding: 0.75rem 0.9rem;
+	margin: 0;
+	font-weight: 600;
 }
 
 .notice.error {
@@ -130,9 +229,18 @@ button:disabled {
 
 .notice.success {
 	background: var(--success-bg);
-	color: var(--accent);
+	color: var(--success);
 }
 
 .muted {
 	color: var(--muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		transition: none !important;
+		animation: none !important;
+	}
 }

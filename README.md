@@ -33,6 +33,18 @@ The pages are `/login`, `/` (book) and `/bookings` (my bookings).
 - **Duplicate protection.** Each confirm sends an `OrderCode`; the server ignores a second booking with the same code.
 - **Payments are out of scope.** Unlike the MVC client's flow, which goes through the payment providers and the Azure DB, this app writes the booking straight to the center server.
 
+## Design
+
+The look follows the eSports Nord landing page: a red header with a Saffron strip, slanted buttons and panel cuts, red hazard stripes, and white headlines with a Verdigris offset shadow. Colors are tokens at the top of `src/app.css`.
+
+| Role | Font | Source |
+| --- | --- | --- |
+| Headers | Unbounded, a free stand-in for INTEGRAL CF | Google Fonts |
+| Subheaders, labels, PC names | Zen Dots | Google Fonts |
+| Text | Montserrat | Google Fonts |
+
+To use the licensed INTEGRAL CF instead, put the font files in `static/fonts/`, add an `@font-face` for them in `src/app.css`, and put that family first in `--font-display`.
+
 ## Configuration
 
 | Variable | Secret? | Description |

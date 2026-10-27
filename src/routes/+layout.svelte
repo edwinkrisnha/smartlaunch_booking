@@ -14,17 +14,21 @@
 </svelte:head>
 
 <header>
-	<a class="brand" href="/">{PUBLIC_CENTER_NAME}</a>
 	{#if data.user}
-		<nav>
-			<a href="/" aria-current={page.url.pathname === '/' ? 'page' : undefined}>Book</a>
-			<a href="/bookings" aria-current={page.url.pathname === '/bookings' ? 'page' : undefined}>My bookings</a>
-		</nav>
-		<form method="POST" action="/logout">
+		<form class="strip" method="POST" action="/logout">
 			<span class="who">{data.user.displayName}</span>
 			<button type="submit">Log out</button>
 		</form>
 	{/if}
+	<div class="bar">
+		<a class="brand" href="/"><span class="mark" aria-hidden="true"></span>{PUBLIC_CENTER_NAME}</a>
+		{#if data.user}
+			<nav>
+				<a href="/" aria-current={page.url.pathname === '/' ? 'page' : undefined}>Book</a>
+				<a href="/bookings" aria-current={page.url.pathname === '/bookings' ? 'page' : undefined}>My bookings</a>
+			</nav>
+		{/if}
+	</div>
 </header>
 
 <main>
@@ -32,61 +36,131 @@
 </main>
 
 <style>
+	/* Red band with an angled lower edge, like the landing page header. */
 	header {
+		position: relative;
+		background: linear-gradient(180deg, var(--fire), #b51f22);
+		color: var(--weiss);
+		clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), 70% calc(100% - 10px), calc(70% - 10px) 100%, 0 100%);
+		padding-bottom: 10px;
+	}
+
+	/* Saffron strip slanting in from the top, carrying the account controls. */
+	.strip {
 		display: flex;
 		align-items: center;
-		gap: 1.5rem;
+		justify-content: flex-end;
+		gap: 1rem;
+		width: fit-content;
+		margin-left: auto;
+		padding: 0.2rem 1.25rem 0.2rem 2.25rem;
+		background: var(--saffron);
+		color: var(--jet);
+		clip-path: polygon(0 0, 100% 0, 100% 100%, 18px 100%);
+	}
+
+	.who {
+		font-family: var(--font-display);
+		font-weight: 700;
+		font-size: 0.7rem;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+	}
+
+	.strip button {
+		min-height: 1.9rem;
+		padding: 0.15rem 0.7rem;
+		background: transparent;
+		border: 1.5px solid var(--jet);
+		color: var(--jet);
+		font-size: 0.78rem;
+		font-weight: 700;
+	}
+
+	.strip button:hover {
+		background: var(--jet);
+		color: var(--saffron);
+	}
+
+	.bar {
+		max-width: 1200px;
+		margin: 0 auto;
+		display: flex;
+		align-items: center;
+		gap: 2.5rem;
 		flex-wrap: wrap;
-		padding: 0.75rem 1rem;
-		border-bottom: 1px solid var(--border);
-		background: var(--surface);
+		padding: 0.8rem 1rem 0.9rem;
 	}
 
 	.brand {
-		font-weight: 700;
-		font-size: 1.1rem;
-		color: var(--text);
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		font-family: var(--font-display);
+		font-weight: 900;
+		font-size: 1.15rem;
+		letter-spacing: 0.02em;
+		text-transform: uppercase;
+		color: var(--weiss);
 		text-decoration: none;
+	}
+
+	.mark {
+		width: 0.85rem;
+		height: 1.35rem;
+		background: var(--weiss);
+		transform: skewX(-14deg);
 	}
 
 	nav {
 		display: flex;
-		gap: 1rem;
-		flex: 1;
+		gap: 1.75rem;
 	}
 
 	nav a {
-		color: var(--muted);
+		font-family: var(--font-display);
+		font-weight: 700;
+		font-size: 1rem;
+		letter-spacing: 0.02em;
+		text-transform: uppercase;
+		color: var(--weiss);
 		text-decoration: none;
-		padding: 0.25rem 0;
-		border-bottom: 2px solid transparent;
+		text-shadow: 0 2px 0 rgb(0 0 0 / 0.25);
+	}
+
+	nav a:hover {
+		color: #ffe7a3;
 	}
 
 	nav a[aria-current='page'] {
-		color: var(--text);
-		border-bottom-color: var(--accent);
-	}
-
-	form {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-	}
-
-	.who {
-		color: var(--muted);
-		font-size: 0.9rem;
+		color: var(--saffron);
 	}
 
 	main {
 		max-width: 1200px;
 		margin: 0 auto;
-		padding: 1.5rem 1rem 3rem;
+		padding: 2.5rem 1rem 4rem;
 	}
 
-	@media (max-width: 560px) {
+	@media (max-width: 640px) {
+		.bar {
+			gap: 0.6rem 1.5rem;
+		}
+
+		nav {
+			flex-basis: 100%;
+			gap: 1.25rem;
+		}
+
+		nav a {
+			font-size: 0.85rem;
+		}
+
 		.who {
-			display: none;
+			max-width: 40vw;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
 		}
 	}
 </style>

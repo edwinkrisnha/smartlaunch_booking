@@ -1,10 +1,24 @@
 <script lang="ts">
-	import { describeLocal, parseLocal } from '#lib/time.js';
+	import { parseLocal } from '#lib/time.js';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
 
 	const pcNames = $derived(new Map(data.pcs.map((pc) => [pc.id, pc.name || `PC ${pc.id}`])));
+
+	const dateFormat = new Intl.DateTimeFormat(undefined, {
+		timeZone: 'UTC',
+		weekday: 'short',
+		day: 'numeric',
+		month: 'short',
+		year: 'numeric'
+	});
+
+	/** Booking times are center wall-clock values, so format them in UTC to avoid any shift. */
+	function dateOf(value: string): string {
+		const seconds = parseLocal(value);
+		return seconds === null ? value : dateFormat.format(new Date(seconds * 1000));
+	}
 
 	function duration(start: string, end: string): string {
 		const minutes = ((parseLocal(end) ?? 0) - (parseLocal(start) ?? 0)) / 60;
@@ -14,58 +28,141 @@
 	}
 </script>
 
-<h1>My bookings</h1>
-<p class="muted">Upcoming bookings on your account.</p>
+<section class="intro">
+	<p class="eyebrow">Your account</p>
+	<h1>My bookings</h1>
+	<div class="hazard" aria-hidden="true"></div>
+</section>
 
 {#if data.loadError}
 	<p class="notice error" role="alert">{data.loadError}</p>
 {:else if data.bookings.length === 0}
 	<section class="card empty">
 		<p>You have no upcoming bookings.</p>
-		<a href="/">Book a PC</a>
+		<a class="cta" href="/">Book a PC</a>
 	</section>
 {:else}
 	<ul class="bookings">
 		{#each data.bookings as booking (booking.bookingId)}
-			<li class="card">
-				<div class="when">{describeLocal(booking.start)}</div>
-				<div class="meta">
-					<span>{duration(booking.start, booking.end)}</span>
-					<span>{booking.computerIds.map((id) => pcNames.get(id) ?? `PC ${id}`).join(', ')}</span>
+			<li>
+				<div class="stub">
+					<span class="time">{booking.start.slice(11)}</span>
+					<span class="date">{dateOf(booking.start)}</span>
 				</div>
-				<div class="id muted">Booking #{booking.bookingId}</div>
+				<dl>
+					<dt>Duration</dt>
+					<dd>{duration(booking.start, booking.end)}, until {booking.end.slice(11)}</dd>
+					<dt>PCs</dt>
+					<dd>{booking.computerIds.map((id) => pcNames.get(id) ?? `PC ${id}`).join(', ')}</dd>
+					<dt>Booking</dt>
+					<dd class="muted">#{booking.bookingId}</dd>
+				</dl>
 			</li>
 		{/each}
 	</ul>
 {/if}
 
 <style>
+	.intro {
+		display: grid;
+		gap: 0.75rem;
+		margin-bottom: 2.25rem;
+	}
+
+	.intro .hazard {
+		margin-top: 0.4rem;
+	}
+
 	.bookings {
 		list-style: none;
 		padding: 0;
-		margin: 1rem 0 0;
+		margin: 0;
 		display: grid;
-		gap: 0.75rem;
+		grid-template-columns: repeat(auto-fill, minmax(min(100%, 440px), 1fr));
+		gap: 1rem;
 	}
 
-	.when {
-		font-weight: 600;
-		font-size: 1.05rem;
+	li {
+		display: grid;
+		grid-template-columns: 9.5rem 1fr;
+		background: var(--surface);
+		border-radius: var(--radius);
+		overflow: hidden;
+		clip-path: polygon(0 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%);
 	}
 
-	.meta {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.25rem 1.5rem;
-		margin-top: 0.25rem;
+	/* Rosewood stub with a dashed tear edge, matching the booking pass. */
+	.stub {
+		display: grid;
+		align-content: center;
+		gap: 0.35rem;
+		padding: 1.1rem;
+		background: var(--rosewood);
+		color: var(--weiss);
+		border-right: 2px dashed rgb(255 255 255 / 0.35);
 	}
 
-	.id {
-		margin-top: 0.4rem;
+	.time {
+		font-family: var(--font-display);
+		font-weight: 900;
+		font-size: 1.9rem;
+		line-height: 1;
+		text-shadow: 0.06em 0.06em 0 var(--verdigris);
+	}
+
+	.date {
 		font-size: 0.85rem;
+		font-weight: 600;
+		color: var(--saffron);
+	}
+
+	dl {
+		display: grid;
+		grid-template-columns: auto 1fr;
+		gap: 0.5rem 1rem;
+		margin: 0;
+		padding: 1.1rem 1.25rem;
+		align-content: center;
+	}
+
+	dt {
+		font-family: var(--font-sub);
+		font-size: 0.7rem;
+		letter-spacing: 0.05em;
+		text-transform: uppercase;
+		color: var(--muted);
+		padding-top: 0.15rem;
+	}
+
+	dd {
+		margin: 0;
+		font-weight: 600;
+		overflow-wrap: anywhere;
 	}
 
 	.empty {
-		margin-top: 1rem;
+		display: grid;
+		justify-items: start;
+		gap: 1rem;
+		padding: 2rem;
+	}
+
+	.empty p {
+		margin: 0;
+		font-size: 1.05rem;
+	}
+
+	@media (max-width: 480px) {
+		li {
+			grid-template-columns: 1fr;
+		}
+
+		.stub {
+			border-right: none;
+			border-bottom: 2px dashed rgb(255 255 255 / 0.35);
+			grid-auto-flow: column;
+			justify-content: space-between;
+			align-items: baseline;
+		}
 	}
 </style>
