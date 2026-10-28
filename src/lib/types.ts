@@ -2,6 +2,10 @@
 // Smartlaunch contracts mirror ISmartlaunchRESTService.vb (PascalCase); the
 // trimmed shapes we hand to the browser use camelCase.
 
+/** Gender choices on the sign-up form. */
+export const GENDERS = ['male', 'female', 'nonbinary'] as const;
+export type Gender = (typeof GENDERS)[number];
+
 export interface SessionUser {
 	username: string;
 	displayName: string;

@@ -24,6 +24,7 @@ export const actions: Actions = {
 			firstName: field('firstName'),
 			lastName: field('lastName'),
 			address: field('address'),
+			gender: field('gender'),
 			birthday: field('birthday')
 		};
 		// Echo everything back except the passwords.

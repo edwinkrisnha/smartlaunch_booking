@@ -1,7 +1,7 @@
 import { CENTER_TIMEZONE } from '$app/env/private';
 import { LocalizedError, translate, type Locale, type MessageKey, type Params } from '#lib/i18n/index.js';
 import { formatLocal, nowInZone, parseLocal, toCompact } from '#lib/time.js';
-import type { Booking, BookingRequest, Layout, Pc, Seat, SessionUser } from '#lib/types.js';
+import { GENDERS, type Booking, type BookingRequest, type Gender, type Layout, type Pc, type Seat, type SessionUser } from '#lib/types.js';
 import * as sl from './smartlaunch';
 
 export const MIN_MINUTES = 30;
@@ -37,11 +37,13 @@ export interface SignupInput {
 	username: string;
 	password: string;
 	email: string;
+	/** Optional; empty when not given. */
 	mobilePhone: string;
 	firstName: string;
 	lastName: string;
-	/** Optional street address. */
 	address: string;
+	/** One of GENDERS. */
+	gender: string;
 	/** `YYYY-MM-DD` */
 	birthday: string;
 }
@@ -57,6 +59,13 @@ const EMAIL_RE = /^[^\s@"]+@[^\s@"']+\.[^\s@"']+$/;
 const PHONE_RE = /^\+?[0-9 ()-]{6,20}$/;
 const MIN_AGE = 5;
 
+/**
+ * Smartlaunch keeps gender in Users.InfoSex: 0 = female, 1 = male. It has no
+ * value for non-binary, so we store 2; the server saves it as given, but the
+ * admin program shows anything other than 1 as female.
+ */
+const SEX_CODES: Record<Gender, number> = { female: 0, male: 1, nonbinary: 2 };
+
 export function validateSignup(input: SignupInput): SignupErrors {
 	const errors: SignupErrors = {};
 	const fail = (field: keyof SignupInput, key: MessageKey, params?: Params) => {
@@ -66,12 +75,14 @@ export function validateSignup(input: SignupInput): SignupErrors {
 	if (!USERNAME_RE.test(input.username)) fail('username', 'signup.usernameHint');
 	if (input.password.length < 6 || input.password.length > 64) fail('password', 'signup.error.password');
 	if (!EMAIL_RE.test(input.email) || input.email.length > 100) fail('email', 'signup.error.email');
-	if (!PHONE_RE.test(input.mobilePhone)) fail('mobilePhone', 'signup.error.mobilePhone');
+	if (input.mobilePhone && !PHONE_RE.test(input.mobilePhone)) fail('mobilePhone', 'signup.error.mobilePhone');
 	if (!input.firstName.trim()) fail('firstName', 'signup.error.firstName');
 	else if (input.firstName.length > 50) fail('firstName', 'signup.error.tooLong', { max: 50 });
 	if (!input.lastName.trim()) fail('lastName', 'signup.error.lastName');
 	else if (input.lastName.length > 50) fail('lastName', 'signup.error.tooLong', { max: 50 });
-	if (input.address.length > 100) fail('address', 'signup.error.tooLong', { max: 100 });
+	if (!input.address.trim()) fail('address', 'signup.error.address');
+	else if (input.address.length > 100) fail('address', 'signup.error.tooLong', { max: 100 });
+	if (!GENDERS.includes(input.gender as Gender)) fail('gender', 'signup.error.gender');
 
 	const born = parseLocal(`${input.birthday}T00:00`);
 	const now = new Date();
@@ -112,7 +123,7 @@ export async function signup(input: SignupInput): Promise<SessionUser> {
 		Email: sqlText(input.email.trim(), 100),
 		Telephone: '',
 		MobilePhone: sqlText(input.mobilePhone.trim(), 20),
-		Sex: 0,
+		Sex: SEX_CODES[input.gender as Gender],
 		PersonalNumber: '',
 		Source: 'Online booking'
 	});

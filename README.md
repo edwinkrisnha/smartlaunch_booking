@@ -15,7 +15,7 @@ The REST API is protected by one shared Basic-auth credential, so the browser ne
 | App endpoint | Smartlaunch REST call |
 | --- | --- |
 | `POST /api/login` `{username, password}` | `GET /users/{username}/check?password=` then `GET /users/{username}` |
-| `POST /api/signup` `{username, password, email, mobilePhone, firstName, lastName, address?, birthday}` | `GET /users/{username}` (is it taken?), `POST /users/create`, then the login calls |
+| `POST /api/signup` `{username, password, email, mobilePhone?, firstName, lastName, address, gender, birthday}` | `GET /users/{username}` (is it taken?), `POST /users/create`, then the login calls |
 | `POST /api/logout` | none |
 | `GET /api/layouts` | `GET /layoutgroups` |
 | `GET /api/computerlayoutpositions` | `GET /computerlayoutpositions` |
@@ -31,7 +31,7 @@ The pages are `/login`, `/signup` (create an account), `/` (book) and `/bookings
 - **Times are center wall-clock time.** The server converts booking timestamps with `New DateTime(1970,1,1).AddSeconds(ts)`, with no time zone involved. The app sends and reads timestamps as naive wall-clock seconds (`src/lib/time.ts`), so `18:00` in the form becomes `18:00` in Smartlaunch whatever zone Cloudflare runs in.
 - **Availability is re-checked before booking.** `APIParser.BookingAdd` only rejects a PC whose existing booking covers the new *start* time. The app first checks the whole window with `/booking/getbooked`, as the MVC client does.
 - **SQL escaping.** The server builds the booking `INSERT` and the sign-up profile `UPDATE` by string concatenation. The app doubles quotes in every text field, allows only numeric PC IDs, restricts order codes to `[A-Z0-9]`, and restricts usernames to letters, numbers, `.`, `-` and `_`.
-- **Sign-up.** New accounts go into the server's "members" group (or its first group). The API has no "unspecified" gender, so accounts are stored with the server's default, female, as the MVC client also does. First name, last name and date of birth are required (the birthday so age limits on apps keep working); the address is optional. The server may refuse a username through its profanity filter; the app then asks for another one.
+- **Sign-up.** New accounts go into the server's "members" group (or its first group). First name, last name, address, gender and date of birth are required (the birthday so age limits on apps keep working); the mobile number is optional. Smartlaunch only knows female (0) and male (1); non-binary is stored as 2, which the server keeps, but the admin program shows it as female and saving the user there turns it into female or male. The server may refuse a username through its profanity filter; the app then asks for another one.
 - **Duplicate protection.** Each confirm sends an `OrderCode`; the server ignores a second booking with the same code.
 - **Payments are out of scope.** Unlike the MVC client's flow, which goes through the payment providers and the Azure DB, this app writes the booking straight to the center server.
 
