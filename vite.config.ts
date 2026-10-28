@@ -10,7 +10,12 @@ export default defineConfig({
 				runes: ({ filename }) =>
 					filename.split(/[/\\]/).includes('node_modules') ? undefined : true
 			},
-			adapter: adapter()
+			// The adapter writes SvelteKit's Worker where wrangler.sveltekit.jsonc says; the deployed
+			// Worker (wrangler.jsonc) wraps it. Dev bindings such as D1 come from wrangler.jsonc.
+			adapter: adapter({
+				config: 'wrangler.sveltekit.jsonc',
+				platformProxy: { configPath: 'wrangler.jsonc' }
+			})
 		})
 	]
 });

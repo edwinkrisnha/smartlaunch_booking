@@ -1,9 +1,31 @@
 {
 	"$schema": "./node_modules/wrangler/config-schema.json",
 	"name": "smartlaunch-booking",
+	// SvelteKit's Worker plus a scheduled job that retries unfinished payments; see worker/index.js.
+	"main": "worker/index.js",
 	"compatibility_date": "2026-10-26",
 	"compatibility_flags": [
 		"nodejs_als"
 	],
-	"pages_build_output_dir": ".svelte-kit/cloudflare"
+	"assets": {
+		"directory": ".svelte-kit/cloudflare",
+		"binding": "ASSETS"
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "smartlaunch-booking",
+			// Replace with the id printed by `npx wrangler d1 create smartlaunch-booking`.
+			"database_id": "00000000-0000-0000-0000-000000000000",
+			"migrations_dir": "migrations"
+		}
+	],
+	"triggers": {
+		"crons": [
+			"*/10 * * * *"
+		]
+	},
+	"observability": {
+		"enabled": true
+	}
 }

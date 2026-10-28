@@ -38,6 +38,11 @@
 				<a href="/bookings" aria-current={page.url.pathname === '/bookings' ? 'page' : undefined}
 					>{t('nav.bookings')}</a
 				>
+				{#if data.payments}
+					<a href="/topup" aria-current={page.url.pathname.startsWith('/topup') ? 'page' : undefined}
+						>{t('nav.topup')}</a
+					>
+				{/if}
 			</nav>
 		{/if}
 		<form class="langs" method="POST" action="/lang" use:enhance aria-label={t('nav.language')}>

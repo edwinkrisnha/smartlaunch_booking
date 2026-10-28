@@ -22,6 +22,7 @@ export interface RawUser {
 	MobilePhone: string;
 	Email: string;
 	Deleted: boolean;
+	Balance: number;
 }
 
 export interface RawUserCreate {
@@ -166,6 +167,18 @@ export async function getUser(username: string): Promise<RawUser | null> {
  */
 export async function createUser(uc: RawUserCreate): Promise<boolean> {
 	return (await request<boolean>('POST', '/users/create', { body: { uc } })) === true;
+}
+
+/**
+ * POST /users/{username}/addmoney (APIParser.UserAddMoney). True when the money was
+ * added, or when this OrderCode was added before: the server records used codes and
+ * skips repeats, so retrying a delivery never credits twice. False when the user
+ * doesn't exist or the deposit failed. The server writes the code into SQL unescaped.
+ */
+export async function addMoney(username: string, amount: number, orderCode: string): Promise<boolean> {
+	if (!/^[A-Z0-9]+$/.test(orderCode)) throw new Error('addMoney: order code must be letters and digits');
+	const body = { uam: { Amount: amount, OrderCode: orderCode } };
+	return (await request<boolean>('POST', `/users/${seg(username)}/addmoney`, { body })) === true;
 }
 
 /** GET /layoutgroups */

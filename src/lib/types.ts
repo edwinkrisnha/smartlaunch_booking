@@ -42,6 +42,16 @@ export interface Booking {
 	customerName: string;
 }
 
+/** A customer's top-up as shown on the top-up page. */
+export interface TopupOrder {
+	id: string;
+	amountCents: number;
+	currency: string;
+	status: 'pending' | 'paid' | 'delivered' | 'failed' | 'expired';
+	/** Unix seconds. */
+	createdAt: number;
+}
+
 export interface BookingRequest {
 	/** Center wall-clock time, `YYYY-MM-DDTHH:mm`. */
 	start: string;

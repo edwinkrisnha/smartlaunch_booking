@@ -47,6 +47,43 @@ export const variables = defineEnvVars({
 			'Language for visitors whose browser asks for none of the supported ones: en, de or da. Defaults to en.',
 		schema: (value) => optional(value)?.trim().toLowerCase()
 	},
+	PAYMENT_PROVIDER: {
+		description:
+			'Payment provider for online top-ups: "sumup". Leave empty to turn online payments off.',
+		schema: (value) => optional(value)?.trim().toLowerCase()
+	},
+	PAYMENT_CURRENCY: {
+		description: 'ISO currency code for payments, e.g. EUR or DKK. Defaults to EUR.',
+		schema: (value) => optional(value)?.trim().toUpperCase() ?? 'EUR'
+	},
+	TOPUP_AMOUNTS: {
+		description: 'Comma-separated quick-pick top-up amounts, e.g. "10,20,50". Defaults to 10,20,50.',
+		schema: (value) =>
+			(optional(value) ?? '10,20,50')
+				.split(',')
+				.map((a) => Number(a.trim()))
+				.filter((a) => Number.isFinite(a) && a > 0)
+	},
+	TOPUP_MIN: {
+		description: 'Smallest top-up amount a customer can enter. Defaults to 5.',
+		schema: (value) => Number(optional(value) ?? 5)
+	},
+	TOPUP_MAX: {
+		description: 'Largest top-up amount a customer can enter. Defaults to 200.',
+		schema: (value) => Number(optional(value) ?? 200)
+	},
+	SUMUP_API_KEY: {
+		description: 'SumUp secret API key (SumUp Dashboard > Developers). Store it as a Cloudflare secret.',
+		schema: optional
+	},
+	SUMUP_MERCHANT_CODE: {
+		description: 'SumUp merchant code that receives the payments, e.g. MH4H92C7.',
+		schema: (value) => optional(value)?.trim()
+	},
+	SUMUP_API_URL: {
+		description: 'Optional. SumUp API base URL; only change it for testing against a mock. Defaults to https://api.sumup.com.',
+		schema: (value) => (optional(value) ?? 'https://api.sumup.com').replace(/\/+$/, '')
+	},
 	THEME: {
 		description:
 			'Folder name under src/themes to style the site with, e.g. "esportsnord". Falls back to "default" if unset or missing.',

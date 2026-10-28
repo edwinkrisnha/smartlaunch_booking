@@ -1,0 +1,12 @@
+// Read only by @sveltejs/adapter-cloudflare at build time (see vite.config.ts): it
+// tells the adapter where to write SvelteKit's Worker. The Worker that is deployed is
+// configured in wrangler.jsonc; its entry, worker/index.js, wraps the file written here.
+{
+	"name": "smartlaunch-booking",
+	"compatibility_date": "2026-10-26",
+	"main": ".svelte-kit/cloudflare/_worker.js",
+	"assets": {
+		"directory": ".svelte-kit/cloudflare",
+		"binding": "ASSETS"
+	}
+}

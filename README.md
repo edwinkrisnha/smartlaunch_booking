@@ -1,16 +1,19 @@
 # Smartlaunch Booking
 
-Customer-facing PC booking site for a Smartlaunch center. Built with SvelteKit and deployed to Cloudflare Pages (free tier).
+Customer-facing PC booking site for a Smartlaunch center. Built with SvelteKit and deployed as a Cloudflare Worker (free tier), with a Cloudflare D1 database for online payments.
 
-It talks to the center's Smartlaunch server REST API (`sl4_server/Classes/Connections/RESTful/ISmartlaunchRESTService.vb`), the same API the MVC web client uses. Customers log in with their Smartlaunch account, pick a date, time and duration, choose free PCs on the center layout, and confirm.
+It talks to the center's Smartlaunch server REST API (`sl4_server/Classes/Connections/RESTful/ISmartlaunchRESTService.vb`), the same API the MVC web client uses. Customers log in with their Smartlaunch account, pick a date, time and duration, choose free PCs on the center layout, and confirm. They can also top up their account balance online (SumUp for now; see [Payments](#payments)).
 
 ## How it works
 
 ```
-Browser ──► Cloudflare Pages (SvelteKit pages + /api/* Functions) ──Basic auth──► Smartlaunch server REST API
+Browser ──► Cloudflare Worker (SvelteKit pages + /api/*) ──Basic auth──► Smartlaunch server REST API
+                    │        ▲
+                    ▼        │ webhooks
+              D1 (orders)   Payment provider (SumUp)
 ```
 
-The REST API is protected by one shared Basic-auth credential, so the browser never calls it directly. The Pages Functions hold that credential as a secret and expose only what a customer needs. Sessions are HMAC-signed cookies, so no KV or database is needed.
+The REST API is protected by one shared Basic-auth credential, so the browser never calls it directly. The Worker holds that credential as a secret and exposes only what a customer needs. Sessions are HMAC-signed cookies. The D1 database only records payments; balances, bookings and accounts stay on the Smartlaunch server.
 
 | App endpoint | Smartlaunch REST call |
 | --- | --- |
@@ -23,8 +26,10 @@ The REST API is protected by one shared Basic-auth credential, so the browser ne
 | `GET /api/booking/getbooked?startdate=yyyyMMddHHmm&enddate=yyyyMMddHHmm`<br>or `?start=YYYY-MM-DDTHH:mm&minutes=N` | `GET /booking/getbooked` |
 | `GET /api/bookings` | `GET /bookings`, filtered to the logged-in customer |
 | `POST /api/bookings` `{start, minutes, computerIds, orderCode?}` | `POST /bookings` |
+| `POST /api/payments/webhook/{provider}` (from the payment provider) | `POST /users/{username}/addmoney` once the payment is confirmed |
+| `POST /api/payments/sweep` (from the scheduled job) | `POST /users/{username}/addmoney` for paid orders not yet delivered |
 
-The pages are `/login`, `/signup` (create an account), `/` (book) and `/bookings` (my bookings). The flags in the header post to `/lang` to switch language.
+The pages are `/login`, `/signup` (create an account), `/` (book), `/bookings` (my bookings), `/topup` (top up the balance) and `/topup/return` (where the payment provider sends customers back). The flags in the header post to `/lang` to switch language.
 
 ### Things worth knowing
 
@@ -33,7 +38,48 @@ The pages are `/login`, `/signup` (create an account), `/` (book) and `/bookings
 - **SQL escaping.** The server builds the booking `INSERT` and the sign-up profile `UPDATE` by string concatenation. The app doubles quotes in every text field, allows only numeric PC IDs, restricts order codes to `[A-Z0-9]`, and restricts usernames to letters, numbers, `.`, `-` and `_`.
 - **Sign-up.** New accounts go into the server's "members" group (or its first group). First name, last name, street and number, ZIP code, city, gender and date of birth are required (the birthday so age limits on apps keep working); the mobile number is optional. Smartlaunch only knows female (0) and male (1); non-binary is stored as 2, which the server keeps, but the admin program shows it as female and saving the user there turns it into female or male. The server may refuse a username through its profanity filter; the app then asks for another one.
 - **Duplicate protection.** Each confirm sends an `OrderCode`; the server ignores a second booking with the same code.
-- **Payments are out of scope.** Unlike the MVC client's flow, which goes through the payment providers and the Azure DB, this app writes the booking straight to the center server.
+- **Bookings are free.** Unlike the MVC client's flow, which charges for bookings through the payment providers and the Azure DB, this app writes bookings straight to the center server. Only top-ups are paid.
+
+## Payments
+
+Customers top up their Smartlaunch balance on `/topup`: they pick an amount, pay on the provider's hosted payment page, and come back to `/topup/return`. Payments are off until `PAYMENT_PROVIDER` is set; the "Top up" link only shows when they're on.
+
+### How an order flows
+
+1. `/topup` stores an order in D1 (`pending`) and creates a checkout at the provider with the order id as reference, then redirects the customer to the provider's payment page.
+2. When the checkout changes, three things may look at the order: the customer's return page, the provider's webhook, and a scheduled job that runs every 10 minutes. Each one **asks the provider's API** for the checkout's status; a webhook alone is never taken as proof of payment.
+3. When the provider reports it paid, and amount, currency and reference match the order, the order becomes `paid` and is credited with `POST /users/{username}/addmoney`, using the order id as Smartlaunch `OrderCode`.
+4. If the center server is offline, the order stays `paid` and is retried with growing delays (1, 2, 4 … minutes, at most 6 hours) until it's `delivered`.
+
+Orders are never credited twice:
+
+- **One credit at a time:** a short lease (`delivering`) in D1 lets only one worker credit an order.
+- **Retries are safe:** the Smartlaunch server ignores an `OrderCode` it has already credited (`APIParser.UserAddMoney`).
+- **Wrong amounts stop:** a checkout paid for a different amount or currency than the order is marked `failed` and not credited; check `last_error` in D1.
+
+To see stuck or failed orders:
+
+```sh
+npx wrangler d1 execute DB --remote --command "SELECT id, username, amount_cents, status, attempts, last_error FROM orders WHERE status NOT IN ('delivered', 'expired') ORDER BY created_at DESC"
+```
+
+### SumUp
+
+1. In the SumUp Dashboard, go to *Developers* and create an **API key**, and note your **merchant code** (shown in your profile, e.g. `MH4H92C7`). For testing, create a sandbox merchant account and use its key.
+2. Set `PAYMENT_PROVIDER=sumup`, `SUMUP_API_KEY` (as a secret), `SUMUP_MERCHANT_CODE` and `PAYMENT_CURRENCY` (the currency of your SumUp account, e.g. `EUR` or `DKK`).
+3. Deploy. Checkouts tell SumUp to send status webhooks to `https://<your site>/api/payments/webhook/sumup`; nothing needs to be registered in the dashboard. Webhooks are only sent when the site runs on `https`, so local runs rely on the return page and the scheduled job.
+
+SumUp's payment page is available for 30 minutes per checkout. A checkout that SumUp reports as failed can still be retried on that page, so the order is only marked `failed` after an hour; checkouts never paid are marked `expired` after a day.
+
+### Adding a payment provider
+
+Providers live in `src/lib/server/payments/`. To add one (Adyen, Stripe, Square, Bambora, …):
+
+1. Write `src/lib/server/payments/<name>.ts` implementing `PaymentProvider` from `provider.ts`: `createCheckout` (create a hosted checkout, return its id and payment page URL), `getCheckout` (read its current status, amount, currency and reference) and `parseWebhook` (pull the checkout id out of a webhook request). See `sumup.ts`.
+2. Add a `case '<name>'` to `create()` in `payments/index.ts`, and its settings to `src/env.ts`.
+3. Set `PAYMENT_PROVIDER=<name>`.
+
+The order logic (`src/lib/server/orders.ts`), pages and database don't change. Webhooks arrive at `/api/payments/webhook/<name>`. They are only used as a hint to re-check the checkout, so providers without signed webhooks are fine. A provider that signs its webhooks can check the signature in `parseWebhook` as well. SvelteKit rejects cross-site POSTs that have no content type or a form content type, so a provider that posts webhooks that way needs a different route.
 
 ## Languages
 
@@ -45,7 +91,7 @@ All text lives in `src/lib/i18n/`: `en.ts` is the reference, and `de.ts` and `da
 
 ## Themes
 
-The site's look comes from a theme in `src/themes/<name>/`. Pick one with `THEME=<name>` in `.env` (or in Cloudflare Pages). If `THEME` is unset or names a folder that doesn't exist, the `default` theme is used and the server logs a warning.
+The site's look comes from a theme in `src/themes/<name>/`. Pick one with `THEME=<name>` in `.env` (or in the Worker's settings on Cloudflare). If `THEME` is unset or names a folder that doesn't exist, the `default` theme is used and the server logs a warning.
 
 | Theme | Look |
 | --- | --- |
@@ -101,6 +147,13 @@ The `esportsnord` theme uses Unbounded as a free stand-in for INTEGRAL CF. To us
 | `PUBLIC_ALLOW_SIGNUP` | no | `false` hides `/signup` and turns off `/api/signup`; on by default |
 | `DEFAULT_LANGUAGE` | no | `en`, `de` or `da`, for visitors whose browser asks for none of them; defaults to `en` (see [Languages](#languages)) |
 | `THEME` | no | Theme folder under `src/themes`; defaults to `default` (see [Themes](#themes)) |
+| `PAYMENT_PROVIDER` | no | `sumup` turns on online top-ups; empty turns them off (see [Payments](#payments)) |
+| `PAYMENT_CURRENCY` | no | Currency of the payment account, e.g. `EUR` or `DKK`; defaults to `EUR` |
+| `TOPUP_AMOUNTS` | no | Quick-pick amounts, e.g. `10,20,50` (the default) |
+| `TOPUP_MIN` / `TOPUP_MAX` | no | Smallest and largest amount a customer can enter; default 5 and 200 |
+| `SUMUP_API_KEY` | yes | SumUp secret API key |
+| `SUMUP_MERCHANT_CODE` | no | SumUp merchant code that receives the payments |
+| `SUMUP_API_URL` | no | Only for testing against a mock; defaults to `https://api.sumup.com` |
 
 ### Reaching the center server from Cloudflare
 
@@ -137,7 +190,13 @@ SL_API_PASSWORD=<RESTBasicPassword>
 SESSION_SECRET=<random string, 32+ characters>
 ```
 
-**3. Start it.**
+**3. Create the local database** (only needed for payments; repeat after adding migrations):
+
+```sh
+npm run db:migrate:local
+```
+
+**4. Start it.**
 
 ```sh
 npm run dev                 # http://localhost:5173
@@ -145,7 +204,7 @@ npm run dev                 # http://localhost:5173
 
 Log in with a customer account from Smartlaunch.
 
-To run in the real Cloudflare Workers runtime, put the same values in `.dev.vars`, then run `npm run build && npm run preview` (http://localhost:4173).
+To run in the real Cloudflare Workers runtime, including the scheduled job, put the same values in `.dev.vars`, then run `npm run build && npm run preview` (http://localhost:4173). With `npx wrangler dev --test-scheduled` instead of `npm run preview`, opening http://localhost:8787/__scheduled runs the scheduled job once.
 
 Other scripts:
 
@@ -153,6 +212,8 @@ Other scripts:
 npm run check               # type check
 npm run gen                 # regenerate worker-configuration.d.ts after editing wrangler.jsonc
 ```
+
+**How the Worker is put together:** the SvelteKit adapter writes the app's Worker to `.svelte-kit/cloudflare/_worker.js` (configured by `wrangler.sveltekit.jsonc`, read only by the adapter). The deployed Worker, configured in `wrangler.jsonc`, starts at `worker/index.js`. That file passes requests to the app's Worker and adds the scheduled job, which calls `/api/payments/sweep` with `SESSION_SECRET` as its key.
 
 ### Troubleshooting
 
@@ -162,24 +223,46 @@ npm run gen                 # regenerate worker-configuration.d.ts after editing
 | "The center server could not be reached" | `SL_API_URL` is wrong, the server is down, or a firewall blocks the port |
 | `SESSION_SECRET must be set…` in the console | `SESSION_SECRET` is missing or shorter than 32 characters |
 | Works locally, fails after deploy | `SL_API_URL` is a LAN or bare IP address; see *Reaching the center server from Cloudflare* |
+| "The payment could not be started" | `SUMUP_API_KEY` or `SUMUP_MERCHANT_CODE` is wrong, or `PAYMENT_CURRENCY` isn't your SumUp account's currency. The Worker logs show SumUp's answer. |
+| "Top up" link missing | `PAYMENT_PROVIDER` is empty, or its settings are incomplete (logged at startup) |
+| `The D1 database binding DB is missing` | `database_id` in `wrangler.jsonc` isn't set, or the migrations weren't applied |
 
-## Deploying to Cloudflare Pages
+## Deploying to Cloudflare Workers
 
-**Option A: Git integration (recommended).** Push this folder to a Git repo, then in Cloudflare go to *Workers & Pages → Create → Pages → Connect to Git* and use:
+The app runs as a Worker, not on Cloudflare Pages, because Pages can't run the scheduled job that finishes payments.
 
-- Framework preset: SvelteKit
-- Build command: `npm run build`
-- Build output directory: `.svelte-kit/cloudflare`
-- Root directory: `smartlaunch_booking`, if it lives in a larger repo
-
-Then add the variables above under *Settings → Variables and Secrets*, using the **Secret** type for the credentials, and redeploy.
-
-**Option B: from your machine.**
+**1. Create the database** (once):
 
 ```sh
 npx wrangler login
-npm run deploy                                   # first run creates the "smartlaunch-booking" project
-npx wrangler pages secret put SL_API_USERNAME    # repeat for each variable
+npx wrangler d1 create smartlaunch-booking
 ```
+
+Copy the printed `database_id` into `wrangler.jsonc`, commit it, then create the tables:
+
+```sh
+npm run db:migrate
+```
+
+Run `npm run db:migrate` again whenever a new file appears in `migrations/`.
+
+**2a. Deploy with Git integration (recommended).** Push this folder to a Git repo, then in Cloudflare go to *Workers & Pages → Create → Workers → Import a repository* and use:
+
+- Build command: `npm run build`
+- Deploy command: `npx wrangler deploy`
+- Root directory: `smartlaunch_booking`, if it lives in a larger repo
+
+Then add the variables above under the Worker's *Settings → Variables and Secrets*, using the **Secret** type for the credentials, and redeploy.
+
+**2b. Or deploy from your machine:**
+
+```sh
+npm run deploy
+npx wrangler secret put SL_API_USERNAME          # repeat for each secret
+```
+
+The site is then at `https://smartlaunch-booking.<your-subdomain>.workers.dev`; add your own domain under the Worker's *Settings → Domains & Routes*.
+
+**Moving from Cloudflare Pages:** create the Worker as above, copy the variables over from the Pages project, move any custom domain to the Worker, then delete the Pages project.
 
 **Recommended:** add a free Cloudflare rate-limiting rule on `/login`, `/api/login`, `/signup` and `/api/signup` to slow down password guessing and bulk sign-ups.

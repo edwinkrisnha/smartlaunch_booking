@@ -18,7 +18,9 @@ export const handle: Handle = async ({ event, resolve }) => {
 	event.locals.locale = locale;
 
 	const { pathname } = event.url;
-	if (!event.locals.user && !PUBLIC_PATHS.has(pathname)) {
+	// Payment webhooks and the scheduled sweep come from servers, not logged-in customers.
+	const isServerCall = pathname.startsWith('/api/payments/webhook/') || pathname === '/api/payments/sweep';
+	if (!event.locals.user && !PUBLIC_PATHS.has(pathname) && !isServerCall) {
 		if (pathname.startsWith('/api/')) {
 			return json({ error: translate(locale, 'error.notLoggedIn') }, { status: 401 });
 		}
