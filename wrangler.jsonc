@@ -14,9 +14,9 @@
 	"d1_databases": [
 		{
 			"binding": "DB",
-			"database_name": "smartlaunch-booking",
+			"database_name": "smartlaunch-esportsnord",
 			// Replace with the id printed by `npx wrangler d1 create smartlaunch-booking`.
-			"database_id": "00000000-0000-0000-0000-000000000000",
+			"database_id": "0316e262-ab46-412d-b8bf-67c1a5943369",
 			"migrations_dir": "migrations"
 		}
 	],
