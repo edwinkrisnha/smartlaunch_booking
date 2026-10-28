@@ -24,6 +24,8 @@ export const actions: Actions = {
 			firstName: field('firstName'),
 			lastName: field('lastName'),
 			address: field('address'),
+			zip: field('zip'),
+			city: field('city'),
 			gender: field('gender'),
 			birthday: field('birthday')
 		};

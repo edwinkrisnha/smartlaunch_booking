@@ -101,7 +101,9 @@
 					<span class="note error" id="gender-note">{errors.gender}</span>
 				{/if}
 			</fieldset>
-			{@render field('address', t('signup.address'), { autocomplete: 'street-address', required: true, maxlength: 100, wide: true })}
+			{@render field('address', t('signup.address'), { autocomplete: 'address-line1', required: true, maxlength: 100, wide: true })}
+			{@render field('zip', t('signup.zip'), { autocomplete: 'postal-code', required: true, maxlength: 10 })}
+			{@render field('city', t('signup.city'), { autocomplete: 'address-level2', required: true, maxlength: 50 })}
 		</div>
 
 		<button class="primary" type="submit" disabled={submitting}>

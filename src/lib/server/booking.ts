@@ -41,7 +41,10 @@ export interface SignupInput {
 	mobilePhone: string;
 	firstName: string;
 	lastName: string;
+	/** Street and house number; Smartlaunch's Address field. */
 	address: string;
+	zip: string;
+	city: string;
 	/** One of GENDERS. */
 	gender: string;
 	/** `YYYY-MM-DD` */
@@ -57,6 +60,8 @@ const USERNAME_RE = /^[A-Za-z0-9_.-]{3,20}$/;
 // Apostrophes are valid before the @ (o'neil@...); quotes are escaped before they reach the server.
 const EMAIL_RE = /^[^\s@"]+@[^\s@"']+\.[^\s@"']+$/;
 const PHONE_RE = /^\+?[0-9 ()-]{6,20}$/;
+// Covers German (12345), Danish (1234) and most other postcodes.
+const ZIP_RE = /^[A-Za-z0-9 -]{3,10}$/;
 const MIN_AGE = 5;
 
 /**
@@ -82,6 +87,9 @@ export function validateSignup(input: SignupInput): SignupErrors {
 	else if (input.lastName.length > 50) fail('lastName', 'signup.error.tooLong', { max: 50 });
 	if (!input.address.trim()) fail('address', 'signup.error.address');
 	else if (input.address.length > 100) fail('address', 'signup.error.tooLong', { max: 100 });
+	if (!ZIP_RE.test(input.zip)) fail('zip', 'signup.error.zip');
+	if (!input.city.trim()) fail('city', 'signup.error.city');
+	else if (input.city.length > 50) fail('city', 'signup.error.tooLong', { max: 50 });
 	if (!GENDERS.includes(input.gender as Gender)) fail('gender', 'signup.error.gender');
 
 	const born = parseLocal(`${input.birthday}T00:00`);
@@ -116,8 +124,8 @@ export async function signup(input: SignupInput): Promise<SessionUser> {
 		LastName: sqlText(input.lastName.trim(), 50),
 		Birthday: parseLocal(`${input.birthday}T00:00`)!,
 		Address: sqlText(input.address.trim(), 100),
-		City: '',
-		Zip: '',
+		City: sqlText(input.city.trim(), 50),
+		Zip: sqlText(input.zip.trim(), 10),
 		State: '',
 		Country: '',
 		Email: sqlText(input.email.trim(), 100),

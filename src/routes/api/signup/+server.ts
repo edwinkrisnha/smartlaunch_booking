@@ -5,7 +5,7 @@ import { createSession } from '#lib/server/session.js';
 import type { RequestHandler } from './$types';
 
 /**
- * POST { username, password, email, mobilePhone?, firstName, lastName, address, gender, birthday }
+ * POST { username, password, email, mobilePhone?, firstName, lastName, address, zip, city, gender, birthday }
  * (gender: "male", "female" or "nonbinary")
  * — creates the account (POST /users/create) and starts a session.
  */
@@ -22,6 +22,8 @@ export const POST: RequestHandler = endpoint(async ({ request, cookies }) => {
 		firstName: text('firstName'),
 		lastName: text('lastName'),
 		address: text('address'),
+		zip: text('zip'),
+		city: text('city'),
 		gender: text('gender'),
 		birthday: text('birthday')
 	});
