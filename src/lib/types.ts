@@ -52,6 +52,18 @@ export interface TopupOrder {
 	createdAt: number;
 }
 
+/** A paid booking as shown on its payment return page. */
+export interface BookingOrder {
+	id: string;
+	amountCents: number;
+	currency: string;
+	status: 'pending' | 'paid' | 'delivered' | 'failed' | 'expired' | 'needs_refund';
+	/** Center wall-clock time, `YYYY-MM-DDTHH:mm`. */
+	start: string;
+	end: string;
+	computerNames: string[];
+}
+
 export interface BookingRequest {
 	/** Center wall-clock time, `YYYY-MM-DDTHH:mm`. */
 	start: string;

@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { SvelteSet } from 'svelte/reactivity';
 	import { INTL_LOCALES, translator } from '#lib/i18n/index.js';
-	import { describeLocal } from '#lib/time.js';
+	import { describeLocal, formatLocal } from '#lib/time.js';
+	import { formatMoney } from '#lib/money.js';
+	import { PLAN_NAMES, type Segment, type StationQuote } from '#lib/pricing.js';
 	import { placeSeats } from '#lib/seatmap.js';
 	import type { PageProps } from './$types';
 
@@ -130,9 +132,71 @@
 	}
 
 	const selectedIds = $derived([...selected].sort((a, b) => Number(a) - Number(b)));
+
+	// Price of the current selection, worked out by the server from the customer's plan.
+	let quote = $state<StationQuote | null>(null);
+	let quoting = $state(false);
+	let quoteError = $state('');
+
+	$effect(() => {
+		const s = start;
+		const m = minutes;
+		const count = selected.size;
+		if (!data.pricing || !validInput || tooEarly || count === 0) {
+			quote = null;
+			quoting = false;
+			quoteError = '';
+			return;
+		}
+
+		const controller = new AbortController();
+		quoting = true;
+		quoteError = '';
+
+		const timer = setTimeout(async () => {
+			try {
+				const query = `start=${encodeURIComponent(s)}&minutes=${m}&stations=${count}`;
+				const res = await fetch(`/api/quote?${query}`, { signal: controller.signal });
+				const body = (await res.json()) as ApiResponse<{ quote: StationQuote | null }>;
+				if (!res.ok || body.quote === undefined) throw new Error(body.error ?? t('book.priceFailed'));
+				quote = body.quote;
+			} catch (err) {
+				if (!controller.signal.aborted) {
+					quote = null;
+					quoteError = (err as Error).message;
+				}
+			} finally {
+				if (!controller.signal.aborted) quoting = false;
+			}
+		}, 250);
+
+		return () => {
+			clearTimeout(timer);
+			controller.abort();
+		};
+	});
+
+	const money = (cents: number, currency: string) => formatMoney(cents, currency, intlLocale);
+	/** "17:00–18:00 €5/h", in the center's time like the rest of the page. */
+	const describeSegment = (seg: Segment, currency: string) =>
+		`${formatLocal(seg.from).slice(11)}–${formatLocal(seg.to).slice(11)} ${t('book.perHour', { rate: money(seg.rate, currency) })}`;
+
 	const canBook = $derived(validInput && !tooEarly && !checking && !availabilityError && selected.size > 0);
 
 	let submitting = $state(false);
+	let redirecting = $state(false);
+
+	// Coming back from the payment page with the browser's Back button restores this page as it was left.
+	$effect(() => {
+		const onShow = (event: PageTransitionEvent) => {
+			if (!event.persisted || !redirecting) return;
+			redirecting = false;
+			submitting = false;
+			refresh++;
+		};
+		addEventListener('pageshow', onShow);
+		return () => removeEventListener('pageshow', onShow);
+	});
 	let result = $state<{ kind: 'success' | 'error'; text: string } | null>(null);
 	// Reusing the order code when the same booking is retried lets the server drop duplicates.
 	let pendingKey = '';
@@ -158,25 +222,38 @@
 				location.href = '/login';
 				return;
 			}
-			const body = (await res.json().catch(() => ({}))) as ApiResponse<{ orderCode: string }>;
+			const body = (await res.json().catch(() => ({}))) as ApiResponse<{
+				orderCode: string;
+				quote: StationQuote | null;
+				paymentUrl: string;
+			}>;
 			if (!res.ok) throw new Error(body.error ?? t('book.failed'));
 
-			result = {
-				kind: 'success',
-				text: t('book.success', {
-					pcs: computerIds.map(nameOf).join(', '),
-					when: describeLocal(start, intlLocale),
-					duration: t('book.hours', { n: hours }),
-					order: body.orderCode ?? ''
-				})
-			};
+			// Paid bookings: the PCs are now held; the booking is confirmed once the payment goes through.
+			if (body.paymentUrl) {
+				redirecting = true;
+				location.href = body.paymentUrl;
+				return;
+			}
+
+			const booked = t('book.success', {
+				pcs: computerIds.map(nameOf).join(', '),
+				when: describeLocal(start, intlLocale),
+				duration: t('book.hours', { n: hours }),
+				order: body.orderCode ?? ''
+			});
+			const price = body.quote ? ` ${t('book.price')}: ${money(body.quote.total, body.quote.currency)}.` : '';
+			result = { kind: 'success', text: booked + price };
 			pendingKey = '';
 			selected.clear();
 		} catch (err) {
 			result = { kind: 'error', text: (err as Error).message };
 		} finally {
-			submitting = false;
-			refresh++;
+			// While the payment page loads, keep the button disabled so the booking isn't started twice.
+			if (!redirecting) {
+				submitting = false;
+				refresh++;
+			}
 		}
 	}
 
@@ -300,6 +377,31 @@
 	<!-- Booking pass, docked to the bottom of the screen so it stays in reach while picking PCs. -->
 	<section class="pass-bar" aria-labelledby="pass-title" bind:clientHeight={barHeight}>
 		<div class="pass-inner">
+			{#if data.pricing && selectedIds.length > 0 && (quote || quoteError) && !quoting}
+				<div class="price-detail">
+					{#if quote}
+						<ul>
+							{#each quote.lines as line (line.plan)}
+								<li>
+									<strong>
+										{quote.lines.length > 1 || line.stations > 1
+											? t('book.stationsAt', { n: line.stations, plan: PLAN_NAMES[line.plan], each: money(line.each, quote.currency) })
+											: t('book.planRate', { plan: PLAN_NAMES[line.plan] })}:
+									</strong>
+									{line.segments.map((seg) => describeSegment(seg, quote!.currency)).join(' · ')}
+								</li>
+							{/each}
+						</ul>
+						<p>
+							{#if quote.lines.length > 1}{t('book.planCoversOne')}{/if}
+							{data.payOnline ? t('book.payNote', { minutes: data.holdMinutes }) : t('book.notChargedOnline')}
+						</p>
+					{:else}
+						<p class="error-text" role="alert">{quoteError}</p>
+					{/if}
+				</div>
+			{/if}
+
 			{#if result}
 				<p class="notice {result.kind}" role={result.kind === 'error' ? 'alert' : 'status'}>
 					{result.text}
@@ -334,10 +436,26 @@
 							<dd class="total">{t('book.hours', { n: selectedIds.length * hours })}</dd>
 						</div>
 					{/if}
+					{#if data.pricing && selectedIds.length > 0}
+						<div>
+							<dt>{t('book.price')}</dt>
+							<dd class="total" aria-live="polite">
+								{#if quoting}{t('book.priceChecking')}{:else if quote}{money(quote.total, quote.currency)}{:else}—{/if}
+							</dd>
+						</div>
+					{/if}
 				</dl>
 
 				<button class="primary" type="button" disabled={!canBook || submitting} onclick={confirm}>
-					{submitting ? t('book.booking') : checking ? t('book.checking') : t('book.confirm')}
+					{redirecting
+						? t('book.redirecting')
+						: submitting
+							? t('book.booking')
+							: checking
+								? t('book.checking')
+								: data.payOnline
+									? t('book.pay')
+									: t('book.confirm')}
 				</button>
 			</div>
 		</div>
@@ -691,6 +809,32 @@
 		max-width: 1200px;
 		margin: 0 auto;
 		padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom));
+	}
+
+	.price-detail {
+		display: grid;
+		gap: 0.15rem;
+		font-size: 0.8rem;
+		color: var(--muted);
+	}
+
+	.price-detail ul {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+	}
+
+	.price-detail strong {
+		color: var(--text);
+		font-weight: 600;
+	}
+
+	.price-detail p {
+		margin: 0;
+	}
+
+	.price-detail .error-text {
+		color: var(--danger);
 	}
 
 	.pass-inner .notice a {

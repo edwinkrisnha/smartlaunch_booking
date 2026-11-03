@@ -72,6 +72,7 @@ export function sumup(config: SumUpConfig): PaymentProvider {
 				description: req.description,
 				redirect_url: req.redirectUrl,
 				...(req.webhookUrl ? { return_url: req.webhookUrl } : {}),
+				...(req.expiresAt ? { valid_until: new Date(req.expiresAt * 1000).toISOString() } : {}),
 				hosted_checkout: { enabled: true }
 			});
 			if (!checkout.id || !checkout.hosted_checkout_url) {

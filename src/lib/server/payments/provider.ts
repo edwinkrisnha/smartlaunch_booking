@@ -15,6 +15,8 @@ export interface CheckoutRequest {
 	redirectUrl: string;
 	/** Where the provider sends status notifications; absent when the site isn't reachable over https (local dev). */
 	webhookUrl?: string;
+	/** Unix seconds after which the checkout must no longer accept payment (a booking hold ending). */
+	expiresAt?: number;
 }
 
 export interface Checkout {

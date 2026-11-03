@@ -16,6 +16,7 @@ export class SmartlaunchError extends LocalizedError {
 export interface RawUser {
 	UserID: string;
 	Username: string;
+	UserGroupID: number;
 	FirstName: string;
 	LastName: string;
 	Telephone: string;
@@ -47,6 +48,11 @@ export interface RawUserCreate {
 	Sex: number;
 	PersonalNumber: string;
 	Source: string;
+}
+
+export interface RawUserGroup {
+	UserGroupID: string;
+	UserGroupName: string;
 }
 
 export interface RawComputer {
@@ -81,6 +87,17 @@ export interface RawBooking {
 	OrderCode: string;
 }
 
+/** Answer of POST /bookings/create and PUT /bookings/{id} (BookingStore on the server). */
+export interface RawBookingResult {
+	Success: boolean;
+	BookingId: string;
+	/** Computers taken by another booking or its turnover buffer, separated by ";". */
+	ConflictingComputers: string;
+	NotFound: boolean;
+}
+
+export type BookingFields = Omit<RawBooking, 'BookingId' | 'OrderCode'>;
+
 const TIMEOUT_MS = 15_000;
 
 function authHeader(): string {
@@ -100,7 +117,7 @@ function buildUrl(path: string, query: Record<string, string> = {}): string {
 }
 
 async function request<T>(
-	method: 'GET' | 'POST',
+	method: 'GET' | 'POST' | 'PUT' | 'DELETE',
 	path: string,
 	{ query, body, notFoundAsNull }: { query?: Record<string, string>; body?: unknown; notFoundAsNull?: boolean } = {}
 ): Promise<T> {
@@ -181,6 +198,11 @@ export async function addMoney(username: string, amount: number, orderCode: stri
 	return (await request<boolean>('POST', `/users/${seg(username)}/addmoney`, { body })) === true;
 }
 
+/** GET /usergroups */
+export async function getUserGroups(): Promise<RawUserGroup[]> {
+	return (await request<RawUserGroup[] | null>('GET', '/usergroups')) ?? [];
+}
+
 /** GET /layoutgroups */
 export async function getLayoutGroups(): Promise<RawLayoutGroup[]> {
 	return (await request<RawLayoutGroup[] | null>('GET', '/layoutgroups')) ?? [];
@@ -221,4 +243,23 @@ export async function getBookings(): Promise<RawBooking[]> {
 export async function addBooking(booking: Omit<RawBooking, 'BookingId'>): Promise<boolean> {
 	const result = await request<string>('POST', '/bookings', { body: { BookingAdd: booking } });
 	return String(result).toLowerCase() === 'true';
+}
+
+/**
+ * POST /bookings/create. Unlike POST /bookings it returns the new BookingID, or
+ * which computers are taken. A repeated OrderCode returns the first booking.
+ * Text fields must already be SQL-escaped. Needs a server with BookingStore.
+ */
+export async function createBookingWithId(booking: BookingFields, orderCode: string): Promise<RawBookingResult> {
+	return request<RawBookingResult>('POST', '/bookings/create', { body: { BookingAdd: { ...booking, OrderCode: orderCode } } });
+}
+
+/** PUT /bookings/{id}: replaces the booking in one step; the original stays if the change clashes. */
+export async function updateBooking(bookingId: string, booking: BookingFields): Promise<RawBookingResult> {
+	return request<RawBookingResult>('PUT', `/bookings/${seg(bookingId)}`, { body: { BookingAdd: { ...booking, OrderCode: '' } } });
+}
+
+/** DELETE /bookings/{id}. False when there is no such booking (already cancelled). */
+export async function deleteBooking(bookingId: string): Promise<boolean> {
+	return (await request<boolean>('DELETE', `/bookings/${seg(bookingId)}`)) === true;
 }

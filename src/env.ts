@@ -84,6 +84,23 @@ export const variables = defineEnvVars({
 		description: 'Optional. SumUp API base URL; only change it for testing against a mock. Defaults to https://api.sumup.com.',
 		schema: (value) => (optional(value) ?? 'https://api.sumup.com').replace(/\/+$/, '')
 	},
+	PRICE_RULES: {
+		description:
+			'Booking price rules to show and record with each booking: "r6" (eSports Nord HUB, revision R6). Leave empty to show no prices.',
+		schema: (value) => optional(value)?.trim().toLowerCase()
+	},
+	PLAN_GROUPS: {
+		description:
+			'Optional. Which Smartlaunch user group gives which price plan, e.g. "campus=Campus Members,pro=Pro,alpha=Alpha,team=TEAM". By default a group named like the plan (campus, pro, alpha, team) gives that plan; anyone else pays Rookie rates.',
+		schema: (value) => {
+			const map = new Map<string, string>();
+			for (const pair of (optional(value) ?? '').split(',')) {
+				const [plan, group] = pair.split('=').map((s) => s?.trim() ?? '');
+				if (plan && group) map.set(group.toLowerCase(), plan.toLowerCase());
+			}
+			return map;
+		}
+	},
 	THEME: {
 		description:
 			'Folder name under src/themes to style the site with, e.g. "esportsnord". Falls back to "default" if unset or missing.',

@@ -2,6 +2,8 @@ import { CENTER_TIMEZONE } from '$app/env/private';
 import { LocalizedError, translate, type Locale, type MessageKey, type Params } from '#lib/i18n/index.js';
 import { formatLocal, nowInZone, parseLocal, toCompact } from '#lib/time.js';
 import { GENDERS, type Booking, type BookingRequest, type Gender, type Layout, type Pc, type Seat, type SessionUser } from '#lib/types.js';
+import { quoteStations, type StationQuote } from '#lib/pricing.js';
+import { planFor, pricingEnabled } from './pricing';
 import * as sl from './smartlaunch';
 
 export const MIN_MINUTES = 30;
@@ -13,7 +15,7 @@ const MAX_PCS_PER_BOOKING = 50;
  * (APIParser.BookingAdd), so every string field we send must have its quotes
  * doubled, the same way the MVC web client does it.
  */
-function sqlText(value: string, maxLength: number): string {
+export function sqlText(value: string, maxLength: number): string {
 	return value.replace(/[\u0000-\u001f]/g, ' ').slice(0, maxLength).replace(/'/g, "''");
 }
 
@@ -229,6 +231,38 @@ export async function listBookings(filterUsername?: string): Promise<Booking[]> 
 	return [...byId.values()].sort((a, b) => a.start.localeCompare(b.start));
 }
 
+/**
+ * Price of booking `stations` stations for this customer, or null when the
+ * center shows no prices. Their plan rate covers one station; it is not given
+ * again while they already have a booking at that time (one discounted session
+ * per member), and further stations are charged at the Rookie rate.
+ */
+async function quoteFor(user: SessionUser, from: number, to: number, stations: number): Promise<StationQuote | null> {
+	if (!pricingEnabled) return null;
+	const [plan, existing] = await Promise.all([planFor(user.username), listBookings(user.username)]);
+	const overlapping = existing.some((b) => {
+		const bFrom = parseLocal(b.start);
+		const bTo = parseLocal(b.end);
+		return bFrom !== null && bTo !== null && bFrom < to && bTo > from;
+	});
+	return quoteStations(plan, from, to, stations, overlapping && plan !== 'rookie');
+}
+
+export async function getQuote(user: SessionUser, start: string, minutes: number, stations: number): Promise<StationQuote | null> {
+	const { from, to } = timeWindow(start, minutes);
+	if (!Number.isInteger(stations) || stations < 1 || stations > MAX_PCS_PER_BOOKING) {
+		throw new BookingError('error.tooManyPcs', 400, { max: MAX_PCS_PER_BOOKING });
+	}
+	return quoteFor(user, from, to, stations);
+}
+
+/** e.g. "Price EUR 13.00 (R6: 1 x campus EUR 3.00, 1 x rookie EUR 5.00)." for the booking description. */
+export function describeQuote(quote: StationQuote): string {
+	const eur = (cents: number) => `${quote.currency} ${(cents / 100).toFixed(2)}`;
+	const lines = quote.lines.map((l) => `${l.stations} x ${l.plan} ${eur(l.each)}`).join(', ');
+	return `Price ${eur(quote.total)} (${quote.version}: ${lines}).`;
+}
+
 export function parseBookingRequest(input: unknown): BookingRequest {
 	const body = (input ?? {}) as Record<string, unknown>;
 	const computerIds = Array.isArray(body.computerIds) ? body.computerIds.map(String) : [];
@@ -240,7 +274,23 @@ export function parseBookingRequest(input: unknown): BookingRequest {
 	};
 }
 
-export async function createBooking(user: SessionUser, req: BookingRequest): Promise<{ orderCode: string }> {
+/** A booking request that passed every check, priced and ready to write. */
+export interface PreparedBooking {
+	/** Wall-clock seconds. */
+	from: number;
+	to: number;
+	computerIds: string[];
+	/** Names of the computers, for confirmations. */
+	computerNames: string[];
+	/** The client's idempotency key, or a fresh one. */
+	orderCode: string;
+	quote: StationQuote | null;
+	/** "Online booking by anna: 2 PC(s) for 2 h." */
+	summary: string;
+}
+
+/** Validate a booking request, check availability and price it. Throws BookingError. */
+export async function prepareBooking(user: SessionUser, req: BookingRequest): Promise<PreparedBooking> {
 	const { from, to } = timeWindow(req.start, req.minutes);
 
 	// Bookings open from the next full hour in the center's time: at 14:20 the earliest start is 15:00.
@@ -268,33 +318,49 @@ export async function createBooking(user: SessionUser, req: BookingRequest): Pro
 		sl.getBookedComputerIds(toCompact(from), toCompact(to))
 	]);
 
-	const knownIds = new Set(known.map((c) => String(c.ComputerID)));
-	if (!ids.every((id) => knownIds.has(id))) throw new BookingError('error.unknownPc');
+	const names = new Map(known.map((c) => [String(c.ComputerID), c.Name || `PC ${c.ComputerID}`]));
+	if (!ids.every((id) => names.has(id))) throw new BookingError('error.unknownPc');
 
-	// APIParser.BookingAdd only rejects a PC whose existing booking covers our
-	// *start* time, so check the full window here first, like the MVC client does.
+	// Older servers only reject a PC whose existing booking covers our *start*
+	// time, so check the full window here first, like the MVC client does.
 	const taken = ids.filter((id) => unavailable.includes(id));
 	if (taken.length > 0) {
 		throw new BookingError('error.taken', 409, { ids: taken.join(', ') });
 	}
 
+	// Priced on the server from the rules, never from an amount the browser sends.
+	const quote = await quoteFor(user, from, to, ids.length);
+
 	const hours = req.minutes / 60;
-	const ok = await sl.addBooking({
-		Description: sqlText(
-			`Online booking by ${user.username}: ${ids.length} PC(s) for ${Number.isInteger(hours) ? hours + ' h' : req.minutes + ' min'}. Order ${orderCode}.`,
-			250
-		),
-		StartDate: from,
-		EndDate: to,
-		Computers: ids.join(';'),
+	const summary = `Online booking by ${user.username}: ${ids.length} PC(s) for ${Number.isInteger(hours) ? hours + ' h' : req.minutes + ' min'}.`;
+	return { from, to, computerIds: ids, computerNames: ids.map((id) => names.get(id)!), orderCode, quote, summary };
+}
+
+/** The Smartlaunch booking for a prepared request, with `note` appended to its description. */
+export function bookingFields(user: SessionUser, booking: PreparedBooking, note: string): sl.BookingFields {
+	return {
+		Description: sqlText(`${booking.summary} ${note}`.trim(), 250),
+		StartDate: booking.from,
+		EndDate: booking.to,
+		Computers: booking.computerIds.join(';'),
 		CustomerName: sqlText(user.username, 100),
 		CustomerPhone: sqlText(user.phone, 50),
-		Smoking: false,
-		OrderCode: orderCode
-	});
+		Smoking: false
+	};
+}
+
+/** Book without online payment (payments or prices turned off). */
+export async function createBooking(
+	user: SessionUser,
+	req: BookingRequest
+): Promise<{ orderCode: string; quote: StationQuote | null }> {
+	const booking = await prepareBooking(user, req);
+	const { orderCode, quote } = booking;
+	const note = `Order ${orderCode}.` + (quote ? ' ' + describeQuote(quote) : '');
+	const ok = await sl.addBooking({ ...bookingFields(user, booking, note), OrderCode: orderCode });
 
 	if (!ok) throw new BookingError('error.justBooked', 409);
-	return { orderCode };
+	return { orderCode, quote };
 }
 
 /** Map any error to a status and a message, in the customer's language, that is safe to show them. */

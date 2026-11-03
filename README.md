@@ -44,6 +44,8 @@ The pages are `/login`, `/signup` (create an account), `/` (book), `/bookings` (
 
 Customers top up their Smartlaunch balance on `/topup`: they pick an amount, pay on the provider's hosted payment page, and come back to `/topup/return`. Payments are off until `PAYMENT_PROVIDER` is set; the "Top up" link only shows when they're on.
 
+When booking prices are on as well (`PRICE_RULES`, see [Booking prices](#booking-prices)), **bookings must be paid online**. See [Paid bookings](#paid-bookings).
+
 ### How an order flows
 
 1. `/topup` stores an order in D1 (`pending`) and creates a checkout at the provider with the order id as reference, then redirects the customer to the provider's payment page.
@@ -63,6 +65,26 @@ To see stuck or failed orders:
 npx wrangler d1 execute DB --remote --command "SELECT id, username, amount_cents, status, attempts, last_error FROM orders WHERE status NOT IN ('delivered', 'expired') ORDER BY created_at DESC"
 ```
 
+### Paid bookings
+
+A booking is held first and paid second, so the same PCs are never sold twice:
+
+1. **Hold.** When the customer confirms, the server prices the booking and books the PCs in Smartlaunch with `POST /bookings/create`. The description says `Awaiting online payment, order BK…; cancelled if unpaid.` Nobody else can book those PCs now.
+2. **Pay.** The customer goes to the provider's payment page. The checkout expires when the hold does, 15 minutes later (`BOOKING_HOLD_MINUTES` in `orders.ts`).
+3. **Confirm.** Once the provider reports the payment, the booking is updated with `PUT /bookings/{id}` to `Paid online, order BK…. Price EUR 13.00 (R6: …).` The customer lands on `/book/return`, which shows the result.
+4. **Release.** If the payment fails or the hold runs out, the booking is cancelled with `DELETE /bookings/{id}` and the PCs are free again. The return page, the webhook and the 10-minute scheduled job all do this, whichever comes first.
+
+A payment can still slip through just as a hold is released. Released orders are checked for an hour afterwards:
+
+- **The PCs are still free:** they are booked again and the order is delivered.
+- **Someone else has taken them:** the order becomes `needs_refund`, the log shows `PAID AFTER ITS HOLD ENDED`, and the customer is asked to contact the center. Refund them in the SumUp dashboard. Find these orders with:
+
+```sh
+npx wrangler d1 execute DB --remote --command "SELECT id, username, amount_cents, created_at FROM orders WHERE status = 'needs_refund'"
+```
+
+This needs a Smartlaunch server with `BookingStore`, which provides `/bookings/create`, `PUT` and `DELETE /bookings/{id}`. Older servers answer 404 and no booking can be made. Run `npm run db:migrate` (and `db:migrate:local`) for migration `0002_booking_orders.sql`.
+
 ### SumUp
 
 1. In the SumUp Dashboard, go to *Developers* and create an **API key**, and note your **merchant code** (shown in your profile, e.g. `MH4H92C7`). For testing, create a sandbox merchant account and use its key.
@@ -80,6 +102,30 @@ Providers live in `src/lib/server/payments/`. To add one (Adyen, Stripe, Square,
 3. Set `PAYMENT_PROVIDER=<name>`.
 
 The order logic (`src/lib/server/orders.ts`), pages and database don't change. Webhooks arrive at `/api/payments/webhook/<name>`. They are only used as a hint to re-check the checkout, so providers without signed webhooks are fine. A provider that signs its webhooks can check the signature in `parseWebhook` as well. SvelteKit rejects cross-site POSTs that have no content type or a form content type, so a provider that posts webhooks that way needs a different route.
+
+## Booking prices
+
+With `PRICE_RULES=r6` the booking page shows what the selected stations cost, and the price is written into the booking's description in Smartlaunch (e.g. `Price EUR 13.00 (R6: 1 x campus EUR 3.00, 1 x rookie EUR 10.00).`). If a payment provider is set up too, customers pay that price online to book (see [Paid bookings](#paid-bookings)). Without one, bookings are made unpaid and the page says nothing is charged online. With `PRICE_RULES` unset, no prices appear anywhere.
+
+`r6` is the eSports Nord HUB price list, revision R6 (31 October 2026). All the rules live in `src/lib/pricing.ts`:
+
+| Plan | Per station per hour (PC or console) |
+| --- | --- |
+| Rookie | €4, or €5 at peak: Mon–Thu 17:00–20:00, Fri 17:00–22:00, Sat–Sun 15:00–22:00 |
+| Campus | €1 Mon–Fri 13:00–18:00, otherwise €2; no peak surcharge |
+| Pro | €2 at all times |
+| Alpha | €1 at all times |
+| TEAM | €2 at all times (private use; included training is arranged by staff) |
+
+- **A booking is split wherever the rate changes**, and each station's price is rounded once to whole cents. Fri 16:30–17:30 at Rookie is €2.00 + €2.50 = €4.50.
+- **Where the plan comes from:** the customer's Smartlaunch user group. A group named `Campus`, `Pro`, `Alpha` or `TEAM` (any case) gives that plan. Use `PLAN_GROUPS` if your group names differ, e.g. `campus=Campus Members,pro=Pro`. Any other group gets Rookie. To change a customer's plan, move them to another user group in the admin program.
+- **The plan covers the customer's own station only.** Extra stations in the same booking are for friends and cost the Rookie rate. A customer who already has a booking at that time gets Rookie rates for the new one, because a member can't run two discounted sessions at once.
+- **The server always recalculates the price.** The browser never sends an amount.
+- **Whole-room prices are in the engine but not on the site yet.** `quoteRoom` covers MIXED ZONE 10, BATTLE ARENA 12, CONSOLE ZONE 6 and CINEMA LOUNGE 4: room capacity × the Rookie rate, 2–6 whole hours, plus optional catering at €10 per guest.
+
+`npm test` checks the engine against the arithmetic cases of the R6 acceptance tables (P, E and R series). It doesn't need a server.
+
+To change prices, edit `src/lib/pricing.ts`, update `PRICING_VERSION` and the tests, then rebuild. Bookings made earlier keep the price in their description.
 
 ## Languages
 
@@ -146,6 +192,8 @@ The `esportsnord` theme uses Unbounded as a free stand-in for INTEGRAL CF. To us
 | `PUBLIC_CENTER_NAME` | no | Name shown in the header |
 | `PUBLIC_ALLOW_SIGNUP` | no | `false` hides `/signup` and turns off `/api/signup`; on by default |
 | `DEFAULT_LANGUAGE` | no | `en`, `de` or `da`, for visitors whose browser asks for none of them; defaults to `en` (see [Languages](#languages)) |
+| `PRICE_RULES` | no | `r6` shows booking prices from the eSports Nord R6 price list; empty shows none (see [Booking prices](#booking-prices)) |
+| `PLAN_GROUPS` | no | Optional mapping from price plans to Smartlaunch user groups, e.g. `campus=Campus Members,pro=Pro` |
 | `THEME` | no | Theme folder under `src/themes`; defaults to `default` (see [Themes](#themes)) |
 | `PAYMENT_PROVIDER` | no | `sumup` turns on online top-ups; empty turns them off (see [Payments](#payments)) |
 | `PAYMENT_CURRENCY` | no | Currency of the payment account, e.g. `EUR` or `DKK`; defaults to `EUR` |
