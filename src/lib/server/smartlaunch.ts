@@ -85,7 +85,18 @@ export interface RawBooking {
 	CustomerPhone: string;
 	Smoking: boolean;
 	OrderCode: string;
+	/**
+	 * Payment state, which the admin program shows as Paid YES/NO: BOOKING_UNPAID or
+	 * BOOKING_PAID_ONLINE. Left out, the server books it as paid (8) and an update keeps
+	 * the current state. Servers from before this field ignore it.
+	 */
+	Paid?: number;
 }
+
+/** Smartlaunch Paymode "Later": not paid yet (an unpaid hold, or paid at the venue). */
+export const BOOKING_UNPAID = 0;
+/** Smartlaunch Paymode "WebInterface": paid online. */
+export const BOOKING_PAID_ONLINE = 8;
 
 /** Answer of POST /bookings/create and PUT /bookings/{id} (BookingStore on the server). */
 export interface RawBookingResult {

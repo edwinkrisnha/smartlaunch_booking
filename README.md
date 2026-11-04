@@ -109,6 +109,8 @@ npx wrangler d1 execute DB --remote --command "SELECT id, username, amount_cents
 | Order number | `BKX7K2M9QP4RT8WZ3N` | booking description and order code | payment description and checkout reference | confirmation page |
 | SumUp transaction code | `TEENSK4W2K` | booking description, once paid | transaction details | SumUp receipt |
 
+In the Smartlaunch admin program, the booking calendar labels each booking `#1234 username`; clicking it shows the number and name at the top, the order number and SumUp code in the note, and **Paid**: NO while the booking waits for payment (or is to be paid at the venue), YES once paid online. Showing the number and setting Paid need the matching admin and server builds; older servers ignore the paid state and show every website booking as paid.
+
 The SumUp payment description reads `Booking #1234, 2026-11-05 17:00, 2 stations, Pro, order BK…`. In D1, `orders` holds all three (`booking_id`, `id`, `provider_txn`). If a late payment is booked again under a new booking number, the order number and transaction code still match. Top-up payments are described as `Top-up <username>, order TU…`. Migration `0004_transaction_code.sql` adds `provider_txn`.
 
 This needs a Smartlaunch server with `BookingStore`, which provides `/bookings/create`, `PUT` and `DELETE /bookings/{id}`. Older servers answer 404 and no booking can be made. Run `npm run db:migrate` (and `db:migrate:local`) for migration `0002_booking_orders.sql`.

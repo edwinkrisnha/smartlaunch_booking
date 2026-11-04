@@ -226,7 +226,11 @@ export async function startBookingPayment(user: SessionUser, booking: PreparedBo
 	let hold: sl.RawBookingResult;
 	try {
 		hold = await sl.createBookingWithId(
-			bookingFields(user, booking, `Awaiting online payment, order ${id}; cancelled if unpaid.`),
+			{
+				...bookingFields(user, booking, `Awaiting online payment, order ${id}; cancelled if unpaid.`),
+				// Shown as Paid NO in the admin program until the payment comes in.
+				Paid: sl.BOOKING_UNPAID
+			},
 			id
 		);
 	} catch (err) {
@@ -386,7 +390,8 @@ function withTransactionCode(fields: sl.BookingFields, row: OrderRow): sl.Bookin
 async function confirmBooking(row: OrderRow): Promise<{ bookingId: string } | 'needs_refund'> {
 	const stored = JSON.parse(row.details ?? 'null') as BookingDetails | null;
 	if (!stored) throw new Error('Booking order has no details');
-	const details = { ...stored, fields: withTransactionCode(stored.fields, row) };
+	// Marked paid, so the admin program shows Paid YES; this also covers booking it again.
+	const details = { ...stored, fields: { ...withTransactionCode(stored.fields, row), Paid: sl.BOOKING_PAID_ONLINE } };
 
 	if (row.booking_id) {
 		const updated = await sl.updateBooking(row.booking_id, details.fields);

@@ -441,7 +441,8 @@ export async function createBooking(
 	const booking = await prepareBooking(user, req);
 	const { orderCode, quote } = booking;
 	const note = `Order ${orderCode}.` + (quote ? ' ' + describeQuote(quote) : '');
-	const ok = await sl.addBooking({ ...bookingFields(user, booking, note), OrderCode: orderCode });
+	// Nothing was paid online; staff collect at the venue, so the admin program shows Paid NO.
+	const ok = await sl.addBooking({ ...bookingFields(user, booking, note), OrderCode: orderCode, Paid: sl.BOOKING_UNPAID });
 
 	if (!ok) throw new BookingError('error.justBooked', 409);
 	return { orderCode, quote };
