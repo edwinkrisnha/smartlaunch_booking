@@ -2,8 +2,12 @@ import { PLAN_GROUPS, PRICE_RULES } from '$app/env/private';
 import { isPlan, type Plan } from '#lib/pricing.js';
 import * as sl from './smartlaunch';
 
-/** Prices are shown and recorded only when the center has chosen a rule set. */
-export const pricingEnabled = PRICE_RULES === 'r6';
+/**
+ * Prices are shown and recorded only when the center has chosen a rule set.
+ * "r6" still switches prices on after the move to R7, so an older setting
+ * doesn't quietly make bookings free; it gets the current rules.
+ */
+export const pricingEnabled = PRICE_RULES === 'r7' || PRICE_RULES === 'r6';
 
 if (PRICE_RULES && !pricingEnabled) console.error(`PRICE_RULES="${PRICE_RULES}" is not a known rule set; prices are off.`);
 

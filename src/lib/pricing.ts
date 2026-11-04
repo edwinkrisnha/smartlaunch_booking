@@ -1,4 +1,4 @@
-// eSports Nord HUB booking prices, revision R6 (31 October 2026). This is the one
+// eSports Nord HUB booking prices, revision R7 (November 2026). This is the one
 // source for every price the site shows or records; change the rules here and
 // bump PRICING_VERSION so stored bookings say which rules priced them.
 //
@@ -8,7 +8,7 @@
 // Arithmetic (spec PRC-02): split at every day and tariff boundary, add up
 // seconds x rate exactly, and round each line once, half up, to cents.
 
-export const PRICING_VERSION = 'R6';
+export const PRICING_VERSION = 'R7';
 export const PRICING_CURRENCY = 'EUR';
 
 export const PLANS = ['rookie', 'campus', 'pro', 'alpha', 'team'] as const;
@@ -49,18 +49,30 @@ const BOUNDARY_HOURS = [...new Set([...Object.values(PEAK).flat(), ...CAMPUS_WIN
 
 const inWindow = (hour: number, [from, to]: [number, number]) => hour >= from && hour < to;
 
+function isPeak(at: number): boolean {
+	return inWindow((at % DAY) / HOUR, PEAK[new Date(at * 1000).getUTCDay()]);
+}
+
+/**
+ * Hourly rate per seat for whole rooms, in cents. Rooms kept the R6 room price
+ * list (section 04) when the personal rates went up in R7.
+ */
+function roomSeatRate(at: number): number {
+	return isPeak(at) ? 500 : 400;
+}
+
 /** Hourly rate in cents for one station at `at`, which must not fall inside a segment boundary. */
 export function stationRate(plan: Plan, at: number): number {
 	const day = new Date(at * 1000).getUTCDay();
 	const hour = (at % DAY) / HOUR;
 	switch (plan) {
 		case 'rookie':
-			return inWindow(hour, PEAK[day]) ? 500 : 400;
+			return isPeak(at) ? 600 : 500;
 		case 'campus':
 			// Campus never takes the peak surcharge; its own window wins (R13, R14).
-			return day >= 1 && day <= 5 && inWindow(hour, CAMPUS_WINDOW) ? 100 : 200;
+			return day >= 1 && day <= 5 && inWindow(hour, CAMPUS_WINDOW) ? 100 : 250;
 		case 'pro':
-			return 200;
+			return 250;
 		case 'alpha':
 			return 100;
 		case 'team':
@@ -168,7 +180,7 @@ export interface RoomQuote {
 export class PricingError extends Error {}
 
 /**
- * Room fee = capacity x Rookie rate over each segment, whatever the guest count;
+ * Room fee = capacity x the room seat rate over each segment, whatever the guest count;
  * the guest count only validates capacity and sizes the optional catering.
  * Turnover buffers are availability only and never charged.
  */
@@ -181,7 +193,7 @@ export function quoteRoom(room: RoomId, from: number, to: number, guests: number
 		throw new PricingError(`Guests must be a whole number from 1 to ${spec.capacity}`);
 	}
 
-	const parts = segments(from, to, (at) => stationRate('rookie', at) * spec.capacity);
+	const parts = segments(from, to, (at) => roomSeatRate(at) * spec.capacity);
 	const roomFee = lineAmount(parts);
 	const cateringFee = catering ? guests * CATERING_PER_GUEST : 0;
 	return {

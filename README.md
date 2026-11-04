@@ -123,25 +123,25 @@ The order logic (`src/lib/server/orders.ts`), pages and database don't change. W
 
 ## Booking prices
 
-With `PRICE_RULES=r6` the booking page shows what the selected stations cost, and the price is written into the booking's description in Smartlaunch (e.g. `Price EUR 13.00 (R6: 1 x campus EUR 3.00, 1 x rookie EUR 10.00).`). If a payment provider is set up too, customers pay that price online to book (see [Paid bookings](#paid-bookings)). Without one, bookings are made unpaid and the page says nothing is charged online. With `PRICE_RULES` unset, no prices appear anywhere.
+With `PRICE_RULES=r7` the booking page shows what the selected stations cost, and the price is written into the booking's description in Smartlaunch (e.g. `Price EUR 15.50 (R7: 1 x campus EUR 3.50, 1 x rookie EUR 12.00).`). If a payment provider is set up too, customers pay that price online to book (see [Paid bookings](#paid-bookings)). Without one, bookings are made unpaid and the page says nothing is charged online. With `PRICE_RULES` unset, no prices appear anywhere.
 
-`r6` is the eSports Nord HUB price list, revision R6 (31 October 2026). All the rules live in `src/lib/pricing.ts`:
+`r7` is the eSports Nord HUB price list, revision R7 (November 2026). `r6` is still accepted and gives the same R7 prices. All the rules live in `src/lib/pricing.ts`:
 
 | Plan | Per station per hour (PC or console) |
 | --- | --- |
-| Rookie | €4, or €5 at peak: Mon–Thu 17:00–20:00, Fri 17:00–22:00, Sat–Sun 15:00–22:00 |
-| Campus | €1 Mon–Fri 13:00–18:00, otherwise €2; no peak surcharge |
-| Pro | €2 at all times |
+| Rookie | €5, or €6 at peak: Mon–Thu 17:00–20:00, Fri 17:00–22:00, Sat–Sun 15:00–22:00 |
+| Campus | €1 Mon–Fri 13:00–18:00, otherwise €2.50; no peak surcharge |
+| Pro | €2.50 at all times |
 | Alpha | €1 at all times |
 | TEAM | €2 at all times (private use; included training is arranged by staff) |
 
-- **A booking is split wherever the rate changes**, and each station's price is rounded once to whole cents. Fri 16:30–17:30 at Rookie is €2.00 + €2.50 = €4.50.
+- **A booking is split wherever the rate changes**, and each station's price is rounded once to whole cents. Fri 16:30–17:30 at Rookie is €2.50 + €3.00 = €5.50.
 - **Where the plan comes from:** the customer's Smartlaunch user group. A group named `Campus`, `Pro`, `Alpha` or `TEAM` (any case) gives that plan. Use `PLAN_GROUPS` if your group names differ, e.g. `campus=Campus Members,pro=Pro`. Any other group gets Rookie. To change a customer's plan, move them to another user group in the admin program.
 - **The plan covers the customer's own station only.** Extra stations in the same booking are for friends and cost the Rookie rate. A customer who already has a booking at that time gets Rookie rates for the new one, because a member can't run two discounted sessions at once.
 - **The server always recalculates the price.** The browser never sends an amount.
-- **Whole-room prices are in the engine but not on the site yet.** `quoteRoom` covers MIXED ZONE 10, BATTLE ARENA 12, CONSOLE ZONE 6 and CINEMA LOUNGE 4: room capacity × the Rookie rate, 2–6 whole hours, plus optional catering at €10 per guest.
+- **Whole-room prices are in the engine but not on the site yet.** `quoteRoom` covers MIXED ZONE 10, BATTLE ARENA 12, CONSOLE ZONE 6 and CINEMA LOUNGE 4: room capacity × €4 per seat per hour (€5 at peak, the R6 room prices), 2–6 whole hours, plus optional catering at €10 per guest.
 
-`npm test` checks the engine against the arithmetic cases of the R6 acceptance tables (P, E and R series). It doesn't need a server.
+`npm test` checks the engine against the arithmetic cases of the R6 acceptance tables (P, E and R series), with the station prices updated to R7. It doesn't need a server.
 
 To change prices, edit `src/lib/pricing.ts`, update `PRICING_VERSION` and the tests, then rebuild. Bookings made earlier keep the price in their description.
 
@@ -210,7 +210,7 @@ The `esportsnord` theme uses Unbounded as a free stand-in for INTEGRAL CF. To us
 | `PUBLIC_CENTER_NAME` | no | Name shown in the header |
 | `PUBLIC_ALLOW_SIGNUP` | no | `false` hides `/signup` and turns off `/api/signup`; on by default |
 | `DEFAULT_LANGUAGE` | no | `en`, `de` or `da`, for visitors whose browser asks for none of them; defaults to `en` (see [Languages](#languages)) |
-| `PRICE_RULES` | no | `r6` shows booking prices from the eSports Nord R6 price list; empty shows none (see [Booking prices](#booking-prices)) |
+| `PRICE_RULES` | no | `r7` shows booking prices from the eSports Nord R7 price list; empty shows none (see [Booking prices](#booking-prices)) |
 | `PLAN_GROUPS` | no | Optional mapping from price plans to Smartlaunch user groups, e.g. `campus=Campus Members,pro=Pro` |
 | `THEME` | no | Theme folder under `src/themes`; defaults to `default` (see [Themes](#themes)) |
 | `TURNSTILE_SITE_KEY` | no | Cloudflare Turnstile site key; with the secret below, sign-up asks visitors to prove they're not a robot |

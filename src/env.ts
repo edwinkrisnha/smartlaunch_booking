@@ -86,7 +86,7 @@ export const variables = defineEnvVars({
 	},
 	PRICE_RULES: {
 		description:
-			'Booking price rules to show and record with each booking: "r6" (eSports Nord HUB, revision R6). Leave empty to show no prices.',
+			'Booking price rules to show and record with each booking: "r7" (eSports Nord HUB, revision R7; "r6" also works). Leave empty to show no prices.',
 		schema: (value) => optional(value)?.trim().toLowerCase()
 	},
 	PLAN_GROUPS: {

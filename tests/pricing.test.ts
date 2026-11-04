@@ -1,5 +1,5 @@
-// Price engine checks against the R6 acceptance tables (P, E and R cases that are
-// pure arithmetic). Run with `npm test`. These prove the rules, not a live booking.
+// Price engine checks: the arithmetic cases of the R6 acceptance tables (P, E and
+// R series), with the station rates of R7; room prices are unchanged since R6. Run with `npm test`. These prove the rules, not a live booking.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -27,27 +27,27 @@ test('reference week starts on a Monday', () => {
 
 test('P01-P16 personal prices', () => {
 	assert.equal(station('campus', 'Mon', '14:00', '16:00'), 200); // P01
-	assert.equal(station('campus', 'Fri', '17:00', '19:00'), 300); // P02
-	assert.equal(station('campus', 'Sat', '20:00', '22:00'), 400); // P03
+	assert.equal(station('campus', 'Fri', '17:00', '19:00'), 350); // P02
+	assert.equal(station('campus', 'Sat', '20:00', '22:00'), 500); // P03
 	assert.equal(station('campus', 'Thu', '13:00', '14:00'), 100); // P04
-	assert.equal(station('campus', 'Thu', '12:30', '13:30'), 150); // P05
-	assert.equal(station('campus', 'Fri', '17:30', '18:30'), 150); // P06
-	assert.equal(station('rookie', 'Fri', '17:00', '19:00'), 1000); // P07
-	assert.equal(station('rookie', 'Sat', '23:30', '00:30', 'Sun'), 400); // P08
-	assert.equal(station('pro', 'Fri', '20:00', '22:00'), 400); // P09
+	assert.equal(station('campus', 'Thu', '12:30', '13:30'), 175); // P05
+	assert.equal(station('campus', 'Fri', '17:30', '18:30'), 175); // P06
+	assert.equal(station('rookie', 'Fri', '17:00', '19:00'), 1200); // P07
+	assert.equal(station('rookie', 'Sat', '23:30', '00:30', 'Sun'), 500); // P08
+	assert.equal(station('pro', 'Fri', '20:00', '22:00'), 500); // P09
 	assert.equal(station('alpha', 'Fri', '20:00', '22:00'), 200); // P10
 	assert.equal(station('campus', 'Mon', '13:00', '13:06'), 10); // P11: not 12 from rounding per minute
 
 	// P12: two Rookie stations.
-	assert.equal(quoteStations('rookie', at('Fri', '20:00'), at('Fri', '22:00'), 2).total, 2000);
+	assert.equal(quoteStations('rookie', at('Fri', '20:00'), at('Fri', '22:00'), 2).total, 2400);
 	// P13 / P16: the Alpha member's discount covers their own station; the friend pays Rookie.
 	const p13 = quoteStations('alpha', at('Fri', '20:00'), at('Fri', '21:00'), 2);
-	assert.equal(p13.total, 600);
+	assert.equal(p13.total, 700);
 	assert.deepEqual(
 		p13.lines.map((l) => [l.plan, l.stations, l.each]),
 		[
 			['alpha', 1, 100],
-			['rookie', 1, 500]
+			['rookie', 1, 600]
 		]
 	);
 	// P14: TEAM private use, not Campus-verified.
@@ -55,27 +55,27 @@ test('P01-P16 personal prices', () => {
 });
 
 test('no second concurrent discounted session (RATE-03)', () => {
-	// Falls back to Rookie: EUR 5 in the Monday peak instead of the Campus EUR 1.
-	assert.equal(quoteStations('campus', at('Mon', '17:00'), at('Mon', '18:00'), 1, true).total, 500);
+	// Falls back to Rookie: EUR 6 in the Monday peak instead of the Campus EUR 1.
+	assert.equal(quoteStations('campus', at('Mon', '17:00'), at('Mon', '18:00'), 1, true).total, 600);
 });
 
 test('R01-R16 peak boundaries and member protection', () => {
-	assert.equal(station('rookie', 'Mon', '16:30', '17:30'), 450); // R01
-	assert.equal(station('rookie', 'Tue', '19:30', '20:30'), 450); // R02
-	assert.equal(station('rookie', 'Wed', '17:00', '20:00'), 1500); // R03
-	assert.equal(station('rookie', 'Thu', '20:00', '21:00'), 400); // R04
-	assert.equal(station('rookie', 'Fri', '16:30', '17:30'), 450); // R05
-	assert.equal(station('rookie', 'Fri', '21:30', '22:30'), 450); // R06
-	assert.equal(station('rookie', 'Fri', '22:00', '23:00'), 400); // R07
-	assert.equal(station('rookie', 'Sat', '14:30', '15:30'), 450); // R08
-	assert.equal(station('rookie', 'Sat', '21:30', '22:30'), 450); // R09
-	assert.equal(station('rookie', 'Sun', '14:30', '15:30'), 450); // R10
-	assert.equal(station('rookie', 'Sun', '21:30', '22:30'), 450); // R11
-	assert.equal(station('rookie', 'Sun', '22:00', '23:00'), 400); // R12
+	assert.equal(station('rookie', 'Mon', '16:30', '17:30'), 550); // R01
+	assert.equal(station('rookie', 'Tue', '19:30', '20:30'), 550); // R02
+	assert.equal(station('rookie', 'Wed', '17:00', '20:00'), 1800); // R03
+	assert.equal(station('rookie', 'Thu', '20:00', '21:00'), 500); // R04
+	assert.equal(station('rookie', 'Fri', '16:30', '17:30'), 550); // R05
+	assert.equal(station('rookie', 'Fri', '21:30', '22:30'), 550); // R06
+	assert.equal(station('rookie', 'Fri', '22:00', '23:00'), 500); // R07
+	assert.equal(station('rookie', 'Sat', '14:30', '15:30'), 550); // R08
+	assert.equal(station('rookie', 'Sat', '21:30', '22:30'), 550); // R09
+	assert.equal(station('rookie', 'Sun', '14:30', '15:30'), 550); // R10
+	assert.equal(station('rookie', 'Sun', '21:30', '22:30'), 550); // R11
+	assert.equal(station('rookie', 'Sun', '22:00', '23:00'), 500); // R12
 	assert.equal(station('campus', 'Mon', '17:00', '18:00'), 100); // R13
-	assert.equal(station('rookie', 'Mon', '17:00', '18:00'), 500); // R13
-	assert.equal(station('campus', 'Fri', '17:00', '19:00'), 300); // R14
-	assert.equal(station('pro', 'Sat', '15:00', '17:00'), 400); // R15
+	assert.equal(station('rookie', 'Mon', '17:00', '18:00'), 600); // R13
+	assert.equal(station('campus', 'Fri', '17:00', '19:00'), 350); // R14
+	assert.equal(station('pro', 'Sat', '15:00', '17:00'), 500); // R15
 	assert.equal(station('alpha', 'Sat', '15:00', '17:00'), 200); // R15
 	assert.equal(station('team', 'Sun', '15:00', '17:00'), 400); // R16
 });

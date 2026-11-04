@@ -339,7 +339,7 @@ async function serverOrderCode(username: string, clientCode: string | undefined)
 	return Array.from(digest.slice(0, 12), (b) => alphabet[b % alphabet.length]).join('');
 }
 
-/** e.g. "Price EUR 13.00 (R6: 1 x campus EUR 3.00, 1 x rookie EUR 5.00)." for the booking description. */
+/** e.g. "Price EUR 9.50 (R7: 1 x campus EUR 3.50, 1 x rookie EUR 6.00)." for the booking description. */
 export function describeQuote(quote: StationQuote): string {
 	const eur = (cents: number) => `${quote.currency} ${(cents / 100).toFixed(2)}`;
 	const lines = quote.lines.map((l) => `${l.stations} x ${l.plan} ${eur(l.each)}`).join(', ');
