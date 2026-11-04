@@ -26,6 +26,9 @@ interface SumUpCheckout {
 	currency: string;
 	status: string;
 	hosted_checkout_url?: string;
+	/** Set once paid: the code shown on the receipt and in the SumUp dashboard. */
+	transaction_code?: string;
+	transactions?: { transaction_code?: string; status?: string }[];
 }
 
 const TIMEOUT_MS = 15_000;
@@ -85,11 +88,15 @@ export function sumup(config: SumUpConfig): PaymentProvider {
 			const checkout = await call<SumUpCheckout>('GET', `/v0.1/checkouts/${encodeURIComponent(providerRef)}`);
 			const status = STATUSES[checkout.status];
 			if (!status) throw new PaymentProviderError(`SumUp checkout ${providerRef} has unknown status ${checkout.status}`);
+			const code =
+				checkout.transaction_code ?? checkout.transactions?.find((t) => t.status === 'SUCCESSFUL')?.transaction_code;
 			return {
 				status,
 				amountCents: Math.round(checkout.amount * 100),
 				currency: checkout.currency,
-				reference: checkout.checkout_reference
+				reference: checkout.checkout_reference,
+				// It ends up in Smartlaunch's booking text, so only plain codes are taken.
+				transactionCode: status === 'paid' && code && /^[A-Za-z0-9-]{1,40}$/.test(code) ? code : undefined
 			};
 		},
 

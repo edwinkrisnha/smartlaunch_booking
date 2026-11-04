@@ -43,7 +43,10 @@
 </script>
 
 <section class="result card {view}" aria-live="polite">
-	<p class="eyebrow">{t('book.order', { id: data.order.id })}</p>
+	<p class="eyebrow">
+		{#if data.order.bookingId && view === 'booked'}{t('book.bookingNumber', { id: data.order.bookingId })} ·
+		{/if}{t('book.order', { id: data.order.id })}
+	</p>
 	<h1>{t(`book.return.${view}.title`)}</h1>
 	<p class="message">{t(`book.return.${view}`, params)}</p>
 

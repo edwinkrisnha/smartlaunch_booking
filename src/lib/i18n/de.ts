@@ -104,6 +104,7 @@ export const de: Record<keyof typeof en, Message> = {
 	'book.payNote': 'Du bezahlst im nächsten Schritt online. Deine PCs sind {minutes} Minuten für dich reserviert, während du bezahlst.',
 	'book.redirecting': 'Zahlung wird geöffnet…',
 	'book.order': 'Bestellung {id}',
+	'book.bookingNumber': 'Buchung #{id}',
 	'book.return.booked.title': 'Du hast gebucht!',
 	'book.return.booked': '{pcs} am {when}, bis {end}. Bezahlt: {amount}.',
 	'book.return.confirming.title': 'Zahlung erhalten',

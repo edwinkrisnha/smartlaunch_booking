@@ -15,6 +15,7 @@
 
 import type { BookingOrder, SessionUser, TopupOrder } from '#lib/types.js';
 import { formatLocal } from '#lib/time.js';
+import { PLAN_NAMES, type StationQuote } from '#lib/pricing.js';
 import { db, nowSeconds } from './db.js';
 import { throttle } from './limits.js';
 import { BookingError, bookingFields, describeQuote, type PreparedBooking } from './booking.js';
@@ -31,6 +32,8 @@ interface OrderRow {
 	status: 'pending' | 'paid' | 'delivering' | 'delivered' | 'failed' | 'expired' | 'needs_refund';
 	provider: string;
 	provider_ref: string | null;
+	/** The provider's code for the payment (on the receipt and in its dashboard), once paid. */
+	provider_txn: string | null;
 	attempts: number;
 	next_attempt_at: number | null;
 	lease_until: number | null;
@@ -96,6 +99,7 @@ function toBookingOrder(row: OrderRow): BookingOrder {
 		amountCents: row.amount_cents,
 		currency: row.currency,
 		status: row.status === 'delivering' ? 'paid' : row.status,
+		bookingId: row.booking_id,
 		start: details.start ?? '',
 		end: details.end ?? '',
 		computerNames: details.computerNames ?? []
@@ -145,7 +149,7 @@ export async function createTopup(username: string, amountCents: number, origin:
 			reference: id,
 			amountCents,
 			currency,
-			description: `Top-up ${username}`,
+			description: `Top-up ${username}, order ${id}`,
 			redirectUrl: `${origin}/topup/return?order=${id}`,
 			// Providers can't reach plain-http or localhost sites; the return page and the sweep cover those.
 			webhookUrl: origin.startsWith('https://') ? `${origin}/api/payments/webhook/${provider.id}` : undefined
@@ -243,7 +247,9 @@ export async function startBookingPayment(user: SessionUser, booking: PreparedBo
 			reference: id,
 			amountCents: quote.total,
 			currency: quote.currency,
-			description: `Booking ${details.start.replace('T', ' ')}, ${booking.computerIds.length} station(s)`,
+			// Shown on SumUp's payment page and in its dashboard: the Smartlaunch booking number
+			// and our order number let staff find the booking from the payment.
+			description: checkoutDescription(hold.BookingId, id, details.start, booking.computerIds.length, quote),
 			redirectUrl: `${origin}/book/return?order=${id}`,
 			webhookUrl: origin.startsWith('https://') ? `${origin}/api/payments/webhook/${provider.id}` : undefined,
 			expiresAt: holdUntil
@@ -317,8 +323,10 @@ export async function syncOrder(id: string): Promise<{ order: TopupOrder; provid
 			} else {
 				// From expired: paid after the hold was released; delivery books the stations again if it can.
 				await db()
-					.prepare(`UPDATE orders SET status = 'paid', paid_at = ?, updated_at = ? WHERE id = ? AND status IN ('pending', 'expired')`)
-					.bind(now, now, id)
+					.prepare(
+						`UPDATE orders SET status = 'paid', paid_at = ?, provider_txn = ?, updated_at = ? WHERE id = ? AND status IN ('pending', 'expired')`
+					)
+					.bind(now, state.transactionCode ?? null, now, id)
 					.run();
 			}
 		} else if (
@@ -350,10 +358,35 @@ export async function syncOrder(id: string): Promise<{ order: TopupOrder; provid
 	return { order: toTopupOrder(row), providerStatus };
 }
 
+/**
+ * e.g. "Booking #1234, 2026-11-05 17:00, 2 stations, Pro, order BKX7K2M9QP4RT8WZ3N":
+ * what the payment is for, as SumUp shows it to the customer and to staff.
+ */
+function checkoutDescription(bookingId: string, orderId: string, start: string, stations: number, quote: StationQuote): string {
+	const plan = quote.lines[0] ? `, ${PLAN_NAMES[quote.lines[0].plan]}` : '';
+	const count = stations === 1 ? '1 station' : `${stations} stations`;
+	return `Booking #${bookingId}, ${start.replace('T', ' ')}, ${count}${plan}, order ${orderId}`;
+}
+
+/**
+ * The paid booking's fields with the provider's transaction code after the order
+ * number ("order BK…, SumUp TEENSK4W2K."), so staff can find the payment from the
+ * booking. Left as they are if the code is unknown or the text would get too long.
+ */
+function withTransactionCode(fields: sl.BookingFields, row: OrderRow): sl.BookingFields {
+	if (!row.provider_txn) return fields;
+	const provider = providerById(row.provider)?.name ?? row.provider;
+	const marker = `order ${row.id}.`;
+	// The code is letters and digits only (checked when it was read), so it needs no SQL escaping.
+	const description = fields.Description.replace(marker, `order ${row.id}, ${provider} ${row.provider_txn}.`);
+	return description.length <= 250 ? { ...fields, Description: description } : fields;
+}
+
 /** Make a paid booking order's booking final: the hold becomes the paid booking, or it is booked again. */
 async function confirmBooking(row: OrderRow): Promise<{ bookingId: string } | 'needs_refund'> {
-	const details = JSON.parse(row.details ?? 'null') as BookingDetails | null;
-	if (!details) throw new Error('Booking order has no details');
+	const stored = JSON.parse(row.details ?? 'null') as BookingDetails | null;
+	if (!stored) throw new Error('Booking order has no details');
+	const details = { ...stored, fields: withTransactionCode(stored.fields, row) };
 
 	if (row.booking_id) {
 		const updated = await sl.updateBooking(row.booking_id, details.fields);

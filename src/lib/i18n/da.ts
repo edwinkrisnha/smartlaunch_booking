@@ -104,6 +104,7 @@ export const da: Record<keyof typeof en, Message> = {
 	'book.payNote': 'Du betaler online i næste trin. Dine PC’er er reserveret i {minutes} minutter, mens du betaler.',
 	'book.redirecting': 'Åbner betaling…',
 	'book.order': 'Ordre {id}',
+	'book.bookingNumber': 'Booking #{id}',
 	'book.return.booked.title': 'Du er booket!',
 	'book.return.booked': '{pcs} {when}, til {end}. Du har betalt {amount}.',
 	'book.return.confirming.title': 'Betaling modtaget',

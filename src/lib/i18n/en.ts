@@ -106,6 +106,7 @@ export const en = {
 	'book.payNote': 'You pay online in the next step. Your PCs are held for {minutes} minutes while you pay.',
 	'book.redirecting': 'Opening payment…',
 	'book.order': 'Order {id}',
+	'book.bookingNumber': 'Booking #{id}',
 	'book.return.booked.title': 'You’re booked!',
 	'book.return.booked': '{pcs} on {when}, until {end}. You paid {amount}.',
 	'book.return.confirming.title': 'Payment received',

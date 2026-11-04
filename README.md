@@ -89,7 +89,7 @@ A booking is held first and paid second, so the same PCs are never sold twice:
 
 1. **Hold.** When the customer confirms, the server prices the booking and books the PCs in Smartlaunch with `POST /bookings/create`. The description says `Awaiting online payment, order BK…; cancelled if unpaid.` Nobody else can book those PCs now.
 2. **Pay.** The customer goes to the provider's payment page. The checkout expires when the hold does, 15 minutes later (`BOOKING_HOLD_MINUTES` in `orders.ts`).
-3. **Confirm.** Once the provider reports the payment, the booking is updated with `PUT /bookings/{id}` to `Paid online, order BK…. Price EUR 13.00 (R6: …).` The customer lands on `/book/return`, which shows the result.
+3. **Confirm.** Once the provider reports the payment, the booking is updated with `PUT /bookings/{id}` to `Paid online, order BK…, SumUp TEENSK4W2K. Price EUR 9.50 (R7: …).` The customer lands on `/book/return`, which shows the result and the booking number.
 4. **Release.** If the payment fails or the hold runs out, the booking is cancelled with `DELETE /bookings/{id}` and the PCs are free again. The return page, the webhook and the 10-minute scheduled job all do this, whichever comes first.
 
 A payment can still slip through just as a hold is released. Released orders are checked for an hour afterwards:
@@ -100,6 +100,16 @@ A payment can still slip through just as a hold is released. Released orders are
 ```sh
 npx wrangler d1 execute DB --remote --command "SELECT id, username, amount_cents, created_at FROM orders WHERE status = 'needs_refund'"
 ```
+
+**Matching a payment to its booking.** Three numbers link them:
+
+| Number | Example | In Smartlaunch | In SumUp | Customer sees it |
+| --- | --- | --- | --- | --- |
+| Booking number | `#1234` | the booking's number | payment description | confirmation page, My bookings |
+| Order number | `BKX7K2M9QP4RT8WZ3N` | booking description and order code | payment description and checkout reference | confirmation page |
+| SumUp transaction code | `TEENSK4W2K` | booking description, once paid | transaction details | SumUp receipt |
+
+The SumUp payment description reads `Booking #1234, 2026-11-05 17:00, 2 stations, Pro, order BK…`. In D1, `orders` holds all three (`booking_id`, `id`, `provider_txn`). If a late payment is booked again under a new booking number, the order number and transaction code still match. Top-up payments are described as `Top-up <username>, order TU…`. Migration `0004_transaction_code.sql` adds `provider_txn`.
 
 This needs a Smartlaunch server with `BookingStore`, which provides `/bookings/create`, `PUT` and `DELETE /bookings/{id}`. Older servers answer 404 and no booking can be made. Run `npm run db:migrate` (and `db:migrate:local`) for migration `0002_booking_orders.sql`.
 

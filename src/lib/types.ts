@@ -58,6 +58,8 @@ export interface BookingOrder {
 	amountCents: number;
 	currency: string;
 	status: 'pending' | 'paid' | 'delivered' | 'failed' | 'expired' | 'needs_refund';
+	/** Smartlaunch booking number (as on My bookings); null until the stations are held. */
+	bookingId: string | null;
 	/** Center wall-clock time, `YYYY-MM-DDTHH:mm`. */
 	start: string;
 	end: string;

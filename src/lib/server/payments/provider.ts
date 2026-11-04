@@ -32,6 +32,11 @@ export interface CheckoutState {
 	amountCents: number;
 	currency: string;
 	reference: string;
+	/**
+	 * The provider's code for the successful payment, as on the customer's receipt
+	 * and in the provider's dashboard (letters and digits). Only set once paid.
+	 */
+	transactionCode?: string;
 }
 
 export interface WebhookEvent {
