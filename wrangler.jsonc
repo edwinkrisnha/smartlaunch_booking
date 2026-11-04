@@ -2,6 +2,8 @@
 	"$schema": "./node_modules/wrangler/config-schema.json",
 	"name": "smartlaunch-booking",
 	// SvelteKit's Worker plus a scheduled job that retries unfinished payments; see worker/index.js.
+	// For eSports Nord, Pages serves booking.esportsnord.com (its DNS is outside Cloudflare,
+	// which a Worker custom domain needs) and this Worker only runs the schedule on workers.dev.
 	"main": "worker/index.js",
 	"compatibility_date": "2026-10-26",
 	"compatibility_flags": [
@@ -18,13 +20,6 @@
 			// Replace with the id printed by `npx wrangler d1 create smartlaunch-booking`.
 			"database_id": "0316e262-ab46-412d-b8bf-67c1a5943369",
 			"migrations_dir": "migrations"
-		}
-	],
-	// The site's address. Cloudflare creates the DNS record and certificate on deploy.
-	"routes": [
-		{
-			"pattern": "booking.esportsnord.com",
-			"custom_domain": true
 		}
 	],
 	"triggers": {

@@ -333,4 +333,10 @@ The site is then at `https://smartlaunch-booking.<your-subdomain>.workers.dev`; 
 
 **Moving from Cloudflare Pages:** create the Worker as above, copy the variables over from the Pages project, move any custom domain to the Worker, then delete the Pages project.
 
+**When the domain's DNS isn't on Cloudflare** (eSports Nord: `booking.esportsnord.com`, DNS at agenturserver). A Worker custom domain needs the domain's DNS in your Cloudflare account, and a CNAME to `workers.dev` doesn't work. Pages does accept an outside CNAME, so the site runs on both:
+
+- **Pages serves the site.** Connect the repo as a Pages project with build command `npm run build`. Under *Settings → Variables and Secrets* add every variable from [Configuration](#configuration), and the plain settings from `vars` in `wrangler.jsonc` too, because Pages ignores that file. Under *Settings → Bindings* add the D1 database as `DB`; without it every login fails with `The D1 database binding DB is missing`. Retry the deployment after changing settings. Add the domain under *Custom domains*, then create the CNAME it shows at your DNS provider.
+- **The Worker only runs the 10-minute payment job.** Deploy it with `npm run deploy`, with the same secrets. It stays on `workers.dev`; both use the same D1 database.
+- **Keep them in step:** after a change, push (Pages) and run `npm run deploy` (Worker), and change a secret in both places.
+
 **Recommended:** add a free Cloudflare rate-limiting rule on `/login`, `/api/login`, `/signup` and `/api/signup` to slow down password guessing and bulk sign-ups.
