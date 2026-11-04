@@ -13,6 +13,56 @@
 	const values = $derived(form?.values);
 	const errors = $derived((form?.errors ?? {}) as Record<string, string | undefined>);
 	const today = new Date().toISOString().slice(0, 10);
+
+	// Cloudflare Turnstile ("not a robot"), when the center has set it up. Rendered
+	// explicitly, because the page can be reached without a full page load.
+	type TurnstileApi = {
+		render: (el: HTMLElement, options: { sitekey: string; language?: string }) => string;
+		reset: (id: string) => void;
+		remove: (id: string) => void;
+	};
+	let turnstileApi: Promise<TurnstileApi> | undefined;
+	let widgetId: string | undefined;
+
+	function loadTurnstile(): Promise<TurnstileApi> {
+		turnstileApi ??= new Promise((resolve, reject) => {
+			const existing = (window as unknown as { turnstile?: TurnstileApi }).turnstile;
+			if (existing) return resolve(existing);
+			const script = document.createElement('script');
+			script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+			script.async = true;
+			script.onload = () => resolve((window as unknown as { turnstile: TurnstileApi }).turnstile);
+			script.onerror = () => {
+				turnstileApi = undefined;
+				reject(new Error('Turnstile could not be loaded'));
+			};
+			document.head.appendChild(script);
+		});
+		return turnstileApi;
+	}
+
+	function turnstile(node: HTMLElement, sitekey: string) {
+		let gone = false;
+		loadTurnstile()
+			.then((api) => {
+				if (!gone) widgetId = api.render(node, { sitekey, language: data.locale });
+			})
+			.catch((err) => console.error(err));
+		return {
+			destroy() {
+				gone = true;
+				const id = widgetId;
+				if (id) turnstileApi?.then((api) => api.remove(id));
+				widgetId = undefined;
+			}
+		};
+	}
+
+	/** A token is good for one try; get a fresh one after a failed submit. */
+	function resetTurnstile() {
+		const id = widgetId;
+		if (id) turnstileApi?.then((api) => api.reset(id));
+	}
 </script>
 
 <section class="signup">
@@ -32,6 +82,7 @@
 			return async ({ update }) => {
 				await update({ reset: false });
 				submitting = false;
+				resetTurnstile();
 			};
 		}}
 	>
@@ -106,6 +157,10 @@
 			{@render field('city', t('signup.city'), { autocomplete: 'address-level2', required: true, maxlength: 50 })}
 		</div>
 
+		{#if data.turnstileSiteKey}
+			<div class="captcha" use:turnstile={data.turnstileSiteKey}></div>
+		{/if}
+
 		<button class="primary" type="submit" disabled={submitting}>
 			{submitting ? t('signup.submitting') : t('signup.submit')}
 		</button>
@@ -122,6 +177,10 @@
 		width: 100%;
 		max-width: 1080px;
 		margin: 0 auto;
+	}
+
+	.captcha {
+		min-height: 65px;
 	}
 
 	.intro {

@@ -177,5 +177,14 @@ export const de: Record<keyof typeof en, Message> = {
 	'error.unreachable': 'Der Server des Centers ist nicht erreichbar. Bitte versuche es später erneut.',
 	'error.misconfigured': 'Der Buchungsdienst ist falsch konfiguriert. Bitte wende dich an das Center.',
 	'error.serverError': 'Der Server des Centers hat einen Fehler gemeldet. Bitte versuche es später erneut.',
-	'error.unexpected': 'Der Server des Centers hat unerwartet geantwortet.'
+	'error.unexpected': 'Der Server des Centers hat unerwartet geantwortet.',
+	'error.tooMany': 'Zu viele Anfragen. Bitte warte kurz und versuche es erneut.',
+	'error.tooManyAttempts': 'Zu viele Anmeldeversuche. Bitte warte 15 Minuten und versuche es erneut.',
+	'error.busy': 'Deine vorherige Buchung wird noch bearbeitet. Bitte versuche es gleich noch einmal.',
+	'error.tooManyHolds': 'Du hast bereits {count} Buchungen, die auf Zahlung warten. Bezahle sie oder warte, bis sie nach {minutes} Minuten verfallen.',
+	'error.tooManyUnpaid': 'Du hast mehrere Buchungen begonnen, ohne zu bezahlen. Bitte versuche es in einer Stunde erneut.',
+	'error.tooManyBookings': 'Du hast bereits {max} bevorstehende Buchungen, mehr sind gleichzeitig nicht möglich.',
+	'error.accountGone': 'Dein Konto ist nicht mehr aktiv. Bitte melde dich erneut an.',
+	'signup.error.tooMany': 'Über deine Verbindung wurden zu viele Konten erstellt. Bitte versuche es später erneut.',
+	'signup.error.captcha': 'Bitte bestätige, dass du kein Roboter bist, und versuche es erneut.',
 };

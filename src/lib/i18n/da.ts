@@ -177,5 +177,14 @@ export const da: Record<keyof typeof en, Message> = {
 	'error.unreachable': 'Centrets server kunne ikke nås. Prøv igen senere.',
 	'error.misconfigured': 'Bookingtjenesten er forkert konfigureret. Kontakt centret.',
 	'error.serverError': 'Centrets server returnerede en fejl. Prøv igen senere.',
-	'error.unexpected': 'Centrets server svarede uventet.'
+	'error.unexpected': 'Centrets server svarede uventet.',
+	'error.tooMany': 'For mange forespørgsler. Vent et øjeblik, og prøv igen.',
+	'error.tooManyAttempts': 'For mange loginforsøg. Vent 15 minutter, og prøv igen.',
+	'error.busy': 'Din forrige booking bliver stadig behandlet. Prøv igen om et øjeblik.',
+	'error.tooManyHolds': 'Du har allerede {count} bookinger, der venter på betaling. Betal dem, eller vent til de udløber efter {minutes} minutter.',
+	'error.tooManyUnpaid': 'Du har startet flere bookinger uden at betale. Prøv igen om en time.',
+	'error.tooManyBookings': 'Du har allerede {max} kommende bookinger, hvilket er det højeste antal ad gangen.',
+	'error.accountGone': 'Din konto er ikke længere aktiv. Log ind igen.',
+	'signup.error.tooMany': 'Der er oprettet for mange konti fra din forbindelse. Prøv igen senere.',
+	'signup.error.captcha': 'Bekræft, at du ikke er en robot, og prøv igen.',
 };

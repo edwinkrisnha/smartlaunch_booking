@@ -13,10 +13,11 @@ export const POST: RequestHandler = async ({ params, request }) => {
 
 	const event = await provider.parseWebhook(request);
 	if (!event) return new Response(null, { status: 204 });
-	await recordPaymentEvent(provider.id, event.providerRef, event.eventType, event.payload);
 
+	// Anyone can call this URL, so only keep notifications about our own checkouts.
 	const orderId = await orderIdForCheckout(provider.id, event.providerRef);
 	if (!orderId) return new Response(null, { status: 204 });
+	await recordPaymentEvent(provider.id, event.providerRef, event.eventType, event.payload);
 
 	try {
 		await syncOrder(orderId);

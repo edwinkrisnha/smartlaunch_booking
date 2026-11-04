@@ -3,12 +3,23 @@ import { LocalizedError, translate, type Locale, type MessageKey, type Params } 
 import { formatLocal, nowInZone, parseLocal, toCompact } from '#lib/time.js';
 import { GENDERS, type Booking, type BookingRequest, type Gender, type Layout, type Pc, type Seat, type SessionUser } from '#lib/types.js';
 import { quoteStations, type StationQuote } from '#lib/pricing.js';
-import { planFor, pricingEnabled } from './pricing';
+import { reached, resetLimit, throttle } from './limits';
+import { planOf, pricingEnabled } from './pricing';
 import * as sl from './smartlaunch';
+import { verifyTurnstile } from './turnstile';
 
 export const MIN_MINUTES = 30;
 export const MAX_MINUTES = 24 * 60;
 const MAX_PCS_PER_BOOKING = 50;
+/** Upcoming bookings one customer may have at once, held or paid. */
+export const MAX_UPCOMING_BOOKINGS = 10;
+
+/** Failed logins per username, and attempts per IP address, within LOGIN_WINDOW. */
+const LOGIN_FAILURES_PER_USER = 10;
+const LOGIN_ATTEMPTS_PER_IP = 30;
+const LOGIN_WINDOW = 15 * 60;
+/** Accounts created per IP address per hour. */
+const SIGNUPS_PER_IP = 5;
 
 /**
  * The server builds the INSERT for /bookings by string concatenation
@@ -22,6 +33,8 @@ export function sqlText(value: string, maxLength: number): string {
 export async function login(username: string, password: string): Promise<SessionUser | null> {
 	username = username.trim();
 	if (!username || !password) return null;
+	// The name becomes a URL path segment: "." and ".." would point at other API paths.
+	if (username === '.' || username === '..' || username.length > 64 || /[\u0000-\u001f]/.test(username)) return null;
 	if (!(await sl.checkPassword(username, password))) return null;
 
 	const user = await sl.getUser(username);
@@ -33,6 +46,28 @@ export async function login(username: string, password: string): Promise<Session
 		displayName: fullName || user.Username || username,
 		phone: user.MobilePhone || user.Telephone || ''
 	};
+}
+
+/**
+ * login() with brute-force protection: at most LOGIN_ATTEMPTS_PER_IP tries per
+ * address and LOGIN_FAILURES_PER_USER wrong passwords per username every 15
+ * minutes. Throws 429 when either is used up.
+ */
+export async function attemptLogin(username: string, password: string, ip: string): Promise<SessionUser | null> {
+	const userKey = `login-user:${username.trim().toLowerCase()}`;
+	await throttle(`login-ip:${ip}`, LOGIN_ATTEMPTS_PER_IP, LOGIN_WINDOW, 'error.tooManyAttempts');
+	if (await reached(userKey, LOGIN_FAILURES_PER_USER)) throw new BookingError('error.tooManyAttempts', 429);
+
+	const user = await login(username, password);
+	if (user) await resetLimit(userKey);
+	else await throttle(userKey, LOGIN_FAILURES_PER_USER, LOGIN_WINDOW, 'error.tooManyAttempts').catch(() => {});
+	return user;
+}
+
+/** Checks before an account is created: the Turnstile challenge (if set up) and SIGNUPS_PER_IP. */
+export async function guardSignup(ip: string, turnstileToken: string): Promise<void> {
+	if (!(await verifyTurnstile(turnstileToken, ip))) throw new BookingError('signup.error.captcha', 400);
+	await throttle(`signup-ip:${ip}`, SIGNUPS_PER_IP, 60 * 60, 'signup.error.tooMany');
 }
 
 export interface SignupInput {
@@ -203,17 +238,34 @@ export async function getUnavailableRaw(startdate: string, enddate: string): Pro
 		throw new BookingError('error.compactDates');
 	}
 	if (enddate < startdate) throw new BookingError('error.endBeforeStart');
+	const compactToLocal = (c: string) => `${c.slice(0, 4)}-${c.slice(4, 6)}-${c.slice(6, 8)}T${c.slice(8, 10)}:${c.slice(10, 12)}`;
+	const from = parseLocal(compactToLocal(startdate));
+	const to = parseLocal(compactToLocal(enddate));
+	if (from === null || to === null) throw new BookingError('error.compactDates');
+	// Same longest window as a booking, so one request can't make the center scan months of bookings.
+	if (to - from > MAX_MINUTES * 60) throw new BookingError('error.duration', 400, { min: MIN_MINUTES, max: MAX_MINUTES });
 	return sl.getBookedComputerIds(startdate, enddate);
 }
 
+/**
+ * Whether a booking is this customer's. The name alone isn't enough: staff can
+ * type any name on a booking, e.g. a walk-in called "anna". So the booking must
+ * also have been made on this site by them, or carry their phone number.
+ */
+function isOwnBooking(row: sl.RawBooking, user: SessionUser): boolean {
+	if (row.CustomerName?.toLowerCase() !== user.username.toLowerCase()) return false;
+	if ((row.Description ?? '').startsWith(`Online booking by ${user.username}:`)) return true;
+	const digits = (phone: string | undefined) => (phone ?? '').replace(/\D/g, '');
+	return digits(user.phone).length >= 6 && digits(row.CustomerPhone) === digits(user.phone);
+}
+
 /** Upcoming bookings, grouped back into one entry per booking (the API returns one row per PC). */
-export async function listBookings(filterUsername?: string): Promise<Booking[]> {
+export async function listBookings(owner?: SessionUser): Promise<Booking[]> {
 	const rows = await sl.getBookings();
-	const wanted = filterUsername?.toLowerCase();
 	const byId = new Map<string, Booking>();
 
 	for (const row of rows) {
-		if (wanted !== undefined && row.CustomerName?.toLowerCase() !== wanted) continue;
+		if (owner && !isOwnBooking(row, owner)) continue;
 		const existing = byId.get(row.BookingId);
 		if (existing) {
 			existing.computerIds.push(...row.Computers.split(';').filter(Boolean));
@@ -237,9 +289,15 @@ export async function listBookings(filterUsername?: string): Promise<Booking[]> 
  * again while they already have a booking at that time (one discounted session
  * per member), and further stations are charged at the Rookie rate.
  */
-async function quoteFor(user: SessionUser, from: number, to: number, stations: number): Promise<StationQuote | null> {
+async function quoteFor(
+	account: sl.RawUser,
+	existing: Booking[],
+	from: number,
+	to: number,
+	stations: number
+): Promise<StationQuote | null> {
 	if (!pricingEnabled) return null;
-	const [plan, existing] = await Promise.all([planFor(user.username), listBookings(user.username)]);
+	const plan = await planOf(account);
 	const overlapping = existing.some((b) => {
 		const bFrom = parseLocal(b.start);
 		const bTo = parseLocal(b.end);
@@ -253,7 +311,32 @@ export async function getQuote(user: SessionUser, start: string, minutes: number
 	if (!Number.isInteger(stations) || stations < 1 || stations > MAX_PCS_PER_BOOKING) {
 		throw new BookingError('error.tooManyPcs', 400, { max: MAX_PCS_PER_BOOKING });
 	}
-	return quoteFor(user, from, to, stations);
+	if (!pricingEnabled) return null;
+	const [account, existing] = await Promise.all([activeAccount(user), listBookings(user)]);
+	return quoteFor(account, existing, from, to, stations);
+}
+
+/** The customer's Smartlaunch account; 401 if it was deleted after they logged in. */
+export async function activeAccount(user: SessionUser): Promise<sl.RawUser> {
+	const account = await sl.getUser(user.username);
+	if (!account || account.Deleted) throw new BookingError('error.accountGone', 401);
+	return account;
+}
+
+/**
+ * The order code sent to Smartlaunch. The browser's code makes a retried request
+ * land on the same booking; hashing it with the username keeps one customer's code
+ * from ever matching another customer's booking.
+ */
+async function serverOrderCode(username: string, clientCode: string | undefined): Promise<string> {
+	if (!clientCode || !/^[A-Z0-9]{8,32}$/.test(clientCode)) {
+		return crypto.randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase();
+	}
+	const digest = new Uint8Array(
+		await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${username.toLowerCase()}:${clientCode}`))
+	);
+	const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+	return Array.from(digest.slice(0, 12), (b) => alphabet[b % alphabet.length]).join('');
 }
 
 /** e.g. "Price EUR 13.00 (R6: 1 x campus EUR 3.00, 1 x rookie EUR 5.00)." for the booking description. */
@@ -306,17 +389,18 @@ export async function prepareBooking(user: SessionUser, req: BookingRequest): Pr
 	if (ids.length > MAX_PCS_PER_BOOKING) throw new BookingError('error.tooManyPcs', 400, { max: MAX_PCS_PER_BOOKING });
 	if (!ids.every((id) => /^\d+$/.test(id))) throw new BookingError('error.invalidPcs');
 
-	// The order code doubles as the server's idempotency key and is interpolated
-	// into SQL without escaping, so only accept a strict alphabet.
-	const orderCode =
-		req.orderCode && /^[A-Z0-9]{8,32}$/.test(req.orderCode)
-			? req.orderCode
-			: crypto.randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase();
+	const orderCode = await serverOrderCode(user.username, req.orderCode);
 
-	const [known, unavailable] = await Promise.all([
+	const [account, existing, known, unavailable] = await Promise.all([
+		activeAccount(user),
+		listBookings(user),
 		sl.getComputers(),
 		sl.getBookedComputerIds(toCompact(from), toCompact(to))
 	]);
+
+	if (existing.length >= MAX_UPCOMING_BOOKINGS) {
+		throw new BookingError('error.tooManyBookings', 409, { max: MAX_UPCOMING_BOOKINGS });
+	}
 
 	const names = new Map(known.map((c) => [String(c.ComputerID), c.Name || `PC ${c.ComputerID}`]));
 	if (!ids.every((id) => names.has(id))) throw new BookingError('error.unknownPc');
@@ -329,7 +413,7 @@ export async function prepareBooking(user: SessionUser, req: BookingRequest): Pr
 	}
 
 	// Priced on the server from the rules, never from an amount the browser sends.
-	const quote = await quoteFor(user, from, to, ids.length);
+	const quote = await quoteFor(account, existing, from, to, ids.length);
 
 	const hours = req.minutes / 60;
 	const summary = `Online booking by ${user.username}: ${ids.length} PC(s) for ${Number.isInteger(hours) ? hours + ' h' : req.minutes + ' min'}.`;

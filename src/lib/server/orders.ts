@@ -16,6 +16,7 @@
 import type { BookingOrder, SessionUser, TopupOrder } from '#lib/types.js';
 import { formatLocal } from '#lib/time.js';
 import { db, nowSeconds } from './db.js';
+import { throttle } from './limits.js';
 import { BookingError, bookingFields, describeQuote, type PreparedBooking } from './booking.js';
 import { pricingEnabled } from './pricing.js';
 import { paymentProvider, paymentSettings, providerById, PaymentProviderError, type PaymentStatus } from './payments/index.js';
@@ -58,6 +59,12 @@ export const BOOKING_HOLD_MINUTES = 15;
 const HOLD_GRACE_SECONDS = 2 * 60;
 /** After a hold is released, its checkout is still checked this long for a payment that slipped through. */
 const LATE_PAYMENT_SECONDS = 60 * 60;
+/** Bookings one customer may have waiting for payment at once. */
+const MAX_OPEN_HOLDS = 2;
+/** Holds a customer may let run out unpaid per hour before they have to wait. */
+const MAX_UNPAID_HOLDS_PER_HOUR = 4;
+/** Top-up checkouts one customer may start per hour. */
+const TOPUPS_PER_HOUR = 10;
 
 const ORDER_ID_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
@@ -119,6 +126,10 @@ export async function createTopup(username: string, amountCents: number, origin:
 		throw new BookingError('topup.error.amount', 400, { min: topupMin, max: topupMax });
 	}
 
+	await throttle(`topup:${username.toLowerCase()}`, TOPUPS_PER_HOUR, 60 * 60);
+	const account = await sl.getUser(username);
+	if (!account || account.Deleted) throw new BookingError('error.accountGone', 401);
+
 	const id = newOrderId('TU');
 	const now = nowSeconds();
 	await db()
@@ -174,8 +185,23 @@ export async function startBookingPayment(user: SessionUser, booking: PreparedBo
 	}
 	if (quote.total <= 0) throw new BookingError('topup.error.start', 500);
 
-	const id = newOrderId('BK');
+	// Holding stations costs nothing until paid, so cap how many a customer can tie up.
 	const now = nowSeconds();
+	const recent = await db()
+		.prepare(
+			`SELECT
+			   COALESCE(SUM(status = 'pending' AND hold_until + ? > ?), 0) AS open,
+			   COALESCE(SUM(status IN ('expired', 'failed') AND booking_id IS NOT NULL AND paid_at IS NULL), 0) AS unpaid
+			 FROM orders WHERE username = ? AND kind = 'booking' AND created_at > ?`
+		)
+		.bind(HOLD_GRACE_SECONDS, now, user.username, now - 60 * 60)
+		.first<{ open: number; unpaid: number }>();
+	if ((recent?.open ?? 0) >= MAX_OPEN_HOLDS) {
+		throw new BookingError('error.tooManyHolds', 409, { count: recent!.open, minutes: BOOKING_HOLD_MINUTES });
+	}
+	if ((recent?.unpaid ?? 0) >= MAX_UNPAID_HOLDS_PER_HOUR) throw new BookingError('error.tooManyUnpaid', 429);
+
+	const id = newOrderId('BK');
 	const holdUntil = now + BOOKING_HOLD_MINUTES * 60;
 	const details: BookingDetails = {
 		fields: bookingFields(user, booking, `Paid online, order ${id}. ${describeQuote(quote)}`),

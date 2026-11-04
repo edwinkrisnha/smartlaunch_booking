@@ -24,10 +24,8 @@ async function groupNames(): Promise<Map<string, string>> {
  * maps group names to plans, otherwise a group named like a plan gives that
  * plan. Everyone else, and anyone we can't look up, pays Rookie rates.
  */
-export async function planFor(username: string): Promise<Plan> {
-	const user = await sl.getUser(username);
-	if (!user) return 'rookie';
-	const group = ((await groupNames()).get(String(user.UserGroupID)) ?? '').trim().toLowerCase();
+export async function planOf(account: sl.RawUser): Promise<Plan> {
+	const group = ((await groupNames()).get(String(account.UserGroupID)) ?? '').trim().toLowerCase();
 	const plan = PLAN_GROUPS.get(group) ?? group;
 	return isPlan(plan) ? plan : 'rookie';
 }

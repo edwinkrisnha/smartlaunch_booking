@@ -179,5 +179,14 @@ export const en = {
 	'error.unreachable': 'The center server could not be reached. Please try again later.',
 	'error.misconfigured': 'The booking service is misconfigured. Please contact the center.',
 	'error.serverError': 'The center server returned an error. Please try again later.',
-	'error.unexpected': 'The center server returned an unexpected response.'
+	'error.unexpected': 'The center server returned an unexpected response.',
+	'error.tooMany': 'Too many requests. Please wait a moment and try again.',
+	'error.tooManyAttempts': 'Too many login attempts. Please wait 15 minutes and try again.',
+	'error.busy': 'Your previous booking is still being processed. Please try again in a moment.',
+	'error.tooManyHolds': 'You already have {count} bookings waiting for payment. Pay for them, or wait until they run out after {minutes} minutes.',
+	'error.tooManyUnpaid': 'You started several bookings without paying. Please try again in an hour.',
+	'error.tooManyBookings': 'You already have {max} upcoming bookings, the most allowed at once.',
+	'error.accountGone': 'Your account is no longer active. Please log in again.',
+	'signup.error.tooMany': 'Too many accounts were created from your connection. Please try again later.',
+	'signup.error.captcha': 'Please confirm you’re not a robot, then try again.',
 } satisfies Record<string, Message>;

@@ -1,7 +1,7 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { translate } from '#lib/i18n/index.js';
 import { safeNext } from '#lib/server/api.js';
-import { login, toHttpError } from '#lib/server/booking.js';
+import { attemptLogin, toHttpError } from '#lib/server/booking.js';
 import { createSession } from '#lib/server/session.js';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -10,7 +10,7 @@ export const load: PageServerLoad = ({ locals, url }) => {
 };
 
 export const actions: Actions = {
-	default: async ({ request, cookies, url, locals }) => {
+	default: async ({ request, cookies, url, locals, getClientAddress }) => {
 		const form = await request.formData();
 		const username = String(form.get('username') ?? '').trim();
 		const password = String(form.get('password') ?? '');
@@ -21,9 +21,10 @@ export const actions: Actions = {
 
 		let user;
 		try {
-			user = await login(username, password);
+			user = await attemptLogin(username, password, getClientAddress());
 		} catch (err) {
-			return fail(502, { username, error: toHttpError(err, locals.locale).message });
+			const { status, message } = toHttpError(err, locals.locale);
+			return fail(status, { username, error: message });
 		}
 		if (!user) return fail(401, { username, error: translate(locals.locale, 'login.incorrect') });
 

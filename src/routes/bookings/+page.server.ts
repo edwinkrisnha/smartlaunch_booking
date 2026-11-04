@@ -3,7 +3,7 @@ import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
 	try {
-		const [bookings, pcs] = await Promise.all([listBookings(locals.user!.username), listPcs()]);
+		const [bookings, pcs] = await Promise.all([listBookings(locals.user!), listPcs()]);
 		return { bookings, pcs, loadError: null };
 	} catch (err) {
 		return { bookings: [], pcs: [], loadError: toHttpError(err, locals.locale).message };

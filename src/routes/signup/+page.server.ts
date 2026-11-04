@@ -1,17 +1,19 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import { PUBLIC_ALLOW_SIGNUP } from '$app/env/public';
 import { translator } from '#lib/i18n/index.js';
-import { signup, toHttpError, validateSignup, type SignupInput } from '#lib/server/booking.js';
+import { guardSignup, signup, toHttpError, validateSignup, type SignupInput } from '#lib/server/booking.js';
 import { createSession } from '#lib/server/session.js';
+import { turnstileSiteKey } from '#lib/server/turnstile.js';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = ({ locals }) => {
 	if (!PUBLIC_ALLOW_SIGNUP) error(404, 'Not found');
 	if (locals.user) redirect(303, '/');
+	return { turnstileSiteKey };
 };
 
 export const actions: Actions = {
-	default: async ({ request, cookies, locals }) => {
+	default: async ({ request, cookies, locals, getClientAddress }) => {
 		if (!PUBLIC_ALLOW_SIGNUP) error(404, 'Not found');
 
 		const form = await request.formData();
@@ -41,6 +43,7 @@ export const actions: Actions = {
 
 		let user;
 		try {
+			await guardSignup(getClientAddress(), String(form.get('cf-turnstile-response') ?? ''));
 			user = await signup(input);
 		} catch (err) {
 			const { status, message } = toHttpError(err, locals.locale);

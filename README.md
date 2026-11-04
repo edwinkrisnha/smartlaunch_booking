@@ -25,7 +25,7 @@ The REST API is protected by one shared Basic-auth credential, so the browser ne
 | `GET /api/computers` | `GET /computers` (trimmed to id, name, group) |
 | `GET /api/booking/getbooked?startdate=yyyyMMddHHmm&enddate=yyyyMMddHHmm`<br>or `?start=YYYY-MM-DDTHH:mm&minutes=N` | `GET /booking/getbooked` |
 | `GET /api/bookings` | `GET /bookings`, filtered to the logged-in customer |
-| `POST /api/bookings` `{start, minutes, computerIds, orderCode?}` | `POST /bookings` |
+| `POST /api/bookings` `{start, minutes, computerIds, orderCode?}` | `POST /bookings`, or `POST /bookings/create` when paid online |
 | `POST /api/payments/webhook/{provider}` (from the payment provider) | `POST /users/{username}/addmoney` once the payment is confirmed |
 | `POST /api/payments/sweep` (from the scheduled job) | `POST /users/{username}/addmoney` for paid orders not yet delivered |
 
@@ -37,8 +37,26 @@ The pages are `/login`, `/signup` (create an account), `/` (book), `/bookings` (
 - **Availability is re-checked before booking.** The app checks the whole window with `/booking/getbooked` before booking. Smartlaunch servers with `BookingStore` also check the whole interval themselves, atomically, and keep each booking's computers blocked for `BookingBufferMinutes` (server.inf) after it ends, both in `/booking/getbooked` and when booking. Older servers only reject a PC whose existing booking covers the new *start* time, so the app's own check is what protects them.
 - **SQL escaping.** The server builds the booking `INSERT` and the sign-up profile `UPDATE` by string concatenation. The app doubles quotes in every text field, allows only numeric PC IDs, restricts order codes to `[A-Z0-9]`, and restricts usernames to letters, numbers, `.`, `-` and `_`.
 - **Sign-up.** New accounts go into the server's "members" group (or its first group). First name, last name, street and number, ZIP code, city, gender and date of birth are required (the birthday so age limits on apps keep working); the mobile number is optional. Smartlaunch only knows female (0) and male (1); non-binary is stored as 2, which the server keeps, but the admin program shows it as female and saving the user there turns it into female or male. The server may refuse a username through its profanity filter; the app then asks for another one.
-- **Duplicate protection.** Each confirm sends an `OrderCode`; the server ignores a second booking with the same code.
-- **Bookings are free.** Unlike the MVC client's flow, which charges for bookings through the payment providers and the Azure DB, this app writes bookings straight to the center server. Only top-ups are paid.
+- **Duplicate protection.** Each confirm sends a code from the browser. The app hashes it with the username into the booking's `OrderCode`, so a retried request lands on the same booking and one customer's code can never match another's.
+- **Bookings are free** unless prices and a payment provider are both set up (see [Paid bookings](#paid-bookings)).
+- **Which bookings are a customer's.** Staff can type any name on a booking, so a booking counts as a customer's only if it has their username *and* was made by them on this site or carries their phone number.
+
+### Abuse limits
+
+Counters live in D1 (`migrations/0003_limits.sql`), so they hold across all Worker instances. A customer who hits one gets a message saying how long to wait.
+
+| What | Limit |
+| --- | --- |
+| Login | 30 tries per IP address and 10 wrong passwords per username, per 15 minutes |
+| Sign-up | 5 accounts per IP address per hour, plus the optional Turnstile check (`TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY`) |
+| Booking | 20 attempts per hour; at most 10 upcoming bookings; one request at a time per customer |
+| Paid booking holds | At most 2 waiting for payment; after 4 unpaid holds in an hour, wait an hour |
+| Top-up | 10 checkouts per hour |
+| Availability, prices, booking list | 120 requests per minute per customer |
+
+Change them with the constants in `booking.ts`, `orders.ts` and the API routes. Booking and top-up also check that the customer's Smartlaunch account still exists; if it was deleted, the session ends.
+
+The site sends a Content-Security-Policy (set in `vite.config.ts`), HSTS over https, `X-Frame-Options: DENY` and `nosniff`. A theme that loads fonts or images from anywhere other than Google Fonts needs that host added to the policy.
 
 ## Payments
 
@@ -195,6 +213,8 @@ The `esportsnord` theme uses Unbounded as a free stand-in for INTEGRAL CF. To us
 | `PRICE_RULES` | no | `r6` shows booking prices from the eSports Nord R6 price list; empty shows none (see [Booking prices](#booking-prices)) |
 | `PLAN_GROUPS` | no | Optional mapping from price plans to Smartlaunch user groups, e.g. `campus=Campus Members,pro=Pro` |
 | `THEME` | no | Theme folder under `src/themes`; defaults to `default` (see [Themes](#themes)) |
+| `TURNSTILE_SITE_KEY` | no | Cloudflare Turnstile site key; with the secret below, sign-up asks visitors to prove they're not a robot |
+| `TURNSTILE_SECRET_KEY` | yes | Turnstile secret key |
 | `PAYMENT_PROVIDER` | no | `sumup` turns on online top-ups; empty turns them off (see [Payments](#payments)) |
 | `PAYMENT_CURRENCY` | no | Currency of the payment account, e.g. `EUR` or `DKK`; defaults to `EUR` |
 | `TOPUP_AMOUNTS` | no | Quick-pick amounts, e.g. `10,20,50` (the default) |

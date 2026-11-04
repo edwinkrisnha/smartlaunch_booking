@@ -33,5 +33,10 @@ export const handle: Handle = async ({ event, resolve }) => {
 	});
 	response.headers.set('X-Frame-Options', 'DENY');
 	response.headers.set('Referrer-Policy', 'same-origin');
+	response.headers.set('X-Content-Type-Options', 'nosniff');
+	// Browsers only accept HSTS over https; this keeps them from ever trying plain http again.
+	if (event.url.protocol === 'https:') {
+		response.headers.set('Strict-Transport-Security', 'max-age=31536000');
+	}
 	return response;
 };

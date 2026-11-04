@@ -101,6 +101,15 @@ export const variables = defineEnvVars({
 			return map;
 		}
 	},
+	TURNSTILE_SITE_KEY: {
+		description:
+			'Optional. Cloudflare Turnstile site key; with TURNSTILE_SECRET_KEY it adds a "not a robot" check to sign-up.',
+		schema: (value) => optional(value)?.trim()
+	},
+	TURNSTILE_SECRET_KEY: {
+		description: 'Optional. Cloudflare Turnstile secret key. Store it as a Cloudflare secret.',
+		schema: (value) => optional(value)?.trim()
+	},
 	THEME: {
 		description:
 			'Folder name under src/themes to style the site with, e.g. "esportsnord". Falls back to "default" if unset or missing.',
