@@ -20,6 +20,13 @@
 			"migrations_dir": "migrations"
 		}
 	],
+	// The site's address. Cloudflare creates the DNS record and certificate on deploy.
+	"routes": [
+		{
+			"pattern": "booking.esportsnord.com",
+			"custom_domain": true
+		}
+	],
 	"triggers": {
 		"crons": [
 			"*/10 * * * *"
@@ -27,5 +34,15 @@
 	},
 	"observability": {
 		"enabled": true
-	}
+	},
+	"vars": {
+    "CENTER_TIMEZONE": "Europe/Berlin",
+    "DEFAULT_LANGUAGE": "en",
+    "PUBLIC_ALLOW_SIGNUP": "true",
+    "PUBLIC_CENTER_NAME": "eSports Nord",
+    "THEME": "esportsnord",
+    "TOPUP_AMOUNTS": "10,20,50",
+    "TOPUP_MAX": "200",
+    "TOPUP_MIN": "5"
+  },
 }
