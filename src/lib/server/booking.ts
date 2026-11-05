@@ -1,4 +1,4 @@
-import { CENTER_TIMEZONE } from '$app/env/private';
+import { CENTER_TIMEZONE, EXCLUDED_PCS } from '$app/env/private';
 import { LocalizedError, translate, type Locale, type MessageKey, type Params } from '#lib/i18n/index.js';
 import { formatLocal, nowInZone, parseLocal, toCompact } from '#lib/time.js';
 import { GENDERS, type Booking, type BookingRequest, type Gender, type Layout, type Pc, type Seat, type SessionUser } from '#lib/types.js';
@@ -227,9 +227,26 @@ function timeWindow(start: string, minutes: number): { from: number; to: number 
 	return { from, to: from + minutes * 60 };
 }
 
+/** IDs of the computers EXCLUDED_PCS names (by name or ID, ignoring case); customers can't book them. */
+function excludedIds(computers: sl.RawComputer[]): string[] {
+	if (EXCLUDED_PCS.size === 0) return [];
+	return computers
+		.filter((c) => EXCLUDED_PCS.has(String(c.ComputerID).toLowerCase()) || EXCLUDED_PCS.has((c.Name ?? '').trim().toLowerCase()))
+		.map((c) => String(c.ComputerID));
+}
+
+/** Booked or otherwise unavailable PCs in the window, plus the ones excluded from online booking. */
+async function unavailableIds(startdate: string, enddate: string): Promise<string[]> {
+	const [booked, computers] = await Promise.all([
+		sl.getBookedComputerIds(startdate, enddate),
+		EXCLUDED_PCS.size > 0 ? sl.getComputers() : Promise.resolve([])
+	]);
+	return [...new Set([...booked, ...excludedIds(computers)])];
+}
+
 export async function getUnavailable(start: string, minutes: number): Promise<string[]> {
 	const { from, to } = timeWindow(start, minutes);
-	return sl.getBookedComputerIds(toCompact(from), toCompact(to));
+	return unavailableIds(toCompact(from), toCompact(to));
 }
 
 /** Raw `startdate`/`enddate` passthrough for the REST-shaped endpoint. */
@@ -244,7 +261,7 @@ export async function getUnavailableRaw(startdate: string, enddate: string): Pro
 	if (from === null || to === null) throw new BookingError('error.compactDates');
 	// Same longest window as a booking, so one request can't make the center scan months of bookings.
 	if (to - from > MAX_MINUTES * 60) throw new BookingError('error.duration', 400, { min: MIN_MINUTES, max: MAX_MINUTES });
-	return sl.getBookedComputerIds(startdate, enddate);
+	return unavailableIds(startdate, enddate);
 }
 
 /**
@@ -407,7 +424,8 @@ export async function prepareBooking(user: SessionUser, req: BookingRequest): Pr
 
 	// Older servers only reject a PC whose existing booking covers our *start*
 	// time, so check the full window here first, like the MVC client does.
-	const taken = ids.filter((id) => unavailable.includes(id));
+	const excluded = excludedIds(known);
+	const taken = ids.filter((id) => unavailable.includes(id) || excluded.includes(id));
 	if (taken.length > 0) {
 		throw new BookingError('error.taken', 409, { ids: taken.join(', ') });
 	}

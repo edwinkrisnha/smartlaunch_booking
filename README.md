@@ -220,6 +220,7 @@ The `esportsnord` theme uses Unbounded as a free stand-in for INTEGRAL CF. To us
 | `CENTER_TIMEZONE` | no | Optional IANA zone (e.g. `Asia/Jakarta`); rejects past start times server-side |
 | `SL_LICENSE_EMAIL` | no | Optional; adds `?licenseemail=` for relay setups |
 | `PUBLIC_CENTER_NAME` | no | Name shown in the header |
+| `EXCLUDED_PCS` | no | PCs customers can't book online, by name or ID, separated by semicolons, e.g. `PC29;PC30`. They show as unavailable on the floor plan, and booking them is refused |
 | `PUBLIC_ALLOW_SIGNUP` | no | `false` hides `/signup` and turns off `/api/signup`; on by default |
 | `DEFAULT_LANGUAGE` | no | `en`, `de` or `da`, for visitors whose browser asks for none of them; defaults to `en` (see [Languages](#languages)) |
 | `PRICE_RULES` | no | `r7` shows booking prices from the eSports Nord R7 price list; empty shows none (see [Booking prices](#booking-prices)) |

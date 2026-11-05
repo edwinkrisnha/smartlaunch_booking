@@ -47,6 +47,17 @@ export const variables = defineEnvVars({
 			'Language for visitors whose browser asks for none of the supported ones: en, de or da. Defaults to en.',
 		schema: (value) => optional(value)?.trim().toLowerCase()
 	},
+	EXCLUDED_PCS: {
+		description:
+			'Optional. PCs customers can never book online, separated by semicolons, by name or ID, e.g. "PC29;PC30". They show as unavailable on the floor plan.',
+		schema: (value) =>
+			new Set(
+				(optional(value) ?? '')
+					.split(';')
+					.map((s) => s.trim().toLowerCase())
+					.filter(Boolean)
+			)
+	},
 	PAYMENT_PROVIDER: {
 		description:
 			'Payment provider for online top-ups: "sumup". Leave empty to turn online payments off.',
