@@ -59,7 +59,10 @@ export interface RawComputer {
 	ComputerID: string;
 	ComputerGroupID: string;
 	Name: string;
-	/** Lists.Consoles.Types name: "Disabled" for a PC, otherwise "Playstation", "XBox", "Nintendo", ... */
+	/**
+	 * Lists.Consoles.Types name: "Disabled", "Dual" or "Laptop" for a PC, otherwise "Playstation",
+	 * "XBox", "Nintendo", ... Older servers send the type number as one control character instead.
+	 */
 	ConsoleType: string;
 }
 

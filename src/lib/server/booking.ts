@@ -186,6 +186,13 @@ export async function listLayouts(): Promise<Layout[]> {
 	return groups.map((g) => ({ id: String(g.LayoutGroupID), name: g.Name }));
 }
 
+/**
+ * Lists.Consoles.Types names that are not a PC. Anything else counts as a PC: "Disabled",
+ * "Dual" (a PC switched by a smart plug), "Laptop", and whatever older servers send, which
+ * can be the type number as a single control character (e.g. "\u0010").
+ */
+const CONSOLE_TYPES = new Set(['xbox', 'playstation', 'nintendo', 'others', 'room', 'table', 'tplink', 'philips', 'xiaomi']);
+
 /** Only the fields a customer needs; the raw contract also exposes who is logged in where. */
 export async function listPcs(): Promise<Pc[]> {
 	const computers = await sl.getComputers();
@@ -193,7 +200,7 @@ export async function listPcs(): Promise<Pc[]> {
 		id: String(c.ComputerID),
 		name: c.Name,
 		groupId: String(c.ComputerGroupID),
-		console: c.ConsoleType && c.ConsoleType !== 'Disabled' ? c.ConsoleType : null
+		console: CONSOLE_TYPES.has((c.ConsoleType ?? '').trim().toLowerCase()) ? c.ConsoleType.trim() : null
 	}));
 }
 
