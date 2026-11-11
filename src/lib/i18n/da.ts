@@ -116,6 +116,10 @@ export const da: Record<keyof typeof en, Message> = {
 	'book.return.refund.title': 'Betalingen kom for sent',
 	'book.return.refund': 'Din betaling på {amount} kom efter reservationen udløb, og PC’erne var booket af en anden. Centret refunderer beløbet. Oplys venligst ordre {id}.',
 	'book.return.again': 'Book igen',
+	'book.return.cancel': 'Annuller booking',
+	'book.return.cancelled.title': 'Bookingen er annulleret',
+	'book.return.cancelled': 'Du annullerede betalingen, så PC’erne er frigivet igen. Du kan booke igen.',
+	'book.cancel.busy': 'Din betaling bliver stadig behandlet, så bookingen kan ikke annulleres lige nu. Prøv igen om lidt.',
 
 	'bookings.eyebrow': 'Din konto',
 	'bookings.title': 'Mine bookinger',

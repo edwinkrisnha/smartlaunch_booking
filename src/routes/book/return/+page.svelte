@@ -3,9 +3,39 @@
 	import { INTL_LOCALES, translator } from '#lib/i18n/index.js';
 	import { formatMoney } from '#lib/money.js';
 	import { describeLocal } from '#lib/time.js';
+	import { UNPAID_ORDER_KEY } from '#lib/unpaid.js';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
+
+	// Back here from the payment page, so going on to the booking page isn't "came back without paying".
+	$effect(() => {
+		try {
+			if (sessionStorage.getItem(UNPAID_ORDER_KEY) === data.order.id) sessionStorage.removeItem(UNPAID_ORDER_KEY);
+		} catch {
+			// Storage blocked: nothing was stored either.
+		}
+	});
+
+	let cancelling = $state(false);
+	let cancelError = $state('');
+
+	async function cancel() {
+		cancelling = true;
+		cancelError = '';
+		try {
+			const res = await fetch(`/api/bookings/${encodeURIComponent(data.order.id)}/cancel`, { method: 'POST' });
+			if (!res.ok) {
+				const body = (await res.json().catch(() => ({}))) as { error?: string };
+				cancelError = body.error ?? t('book.failed');
+			}
+		} catch {
+			cancelError = t('book.failed');
+		} finally {
+			await invalidateAll();
+			cancelling = false;
+		}
+	}
 
 	const t = $derived(translator(data.locale));
 	const intlLocale = $derived(INTL_LOCALES[data.locale]);
@@ -16,6 +46,7 @@
 		if (status === 'delivered') return 'booked';
 		if (status === 'paid') return 'confirming';
 		if (status === 'needs_refund') return 'refund';
+		if (data.order.cancelled) return 'cancelled';
 		if (status === 'pending' && data.providerStatus !== 'failed') return 'pending';
 		return 'failed';
 	});
@@ -49,12 +80,15 @@
 	</p>
 	<h1>{t(`book.return.${view}.title`)}</h1>
 	<p class="message">{t(`book.return.${view}`, params)}</p>
+	{#if cancelError}<p class="message error" role="alert">{cancelError}</p>{/if}
 
 	<div class="actions">
 		{#if view === 'booked'}
 			<a class="cta" href="/bookings">{t('book.viewBookings')}</a>
-		{:else if view === 'failed'}
+		{:else if view === 'failed' || view === 'cancelled'}
 			<a class="cta" href="/">{t('book.return.again')}</a>
+		{:else if view === 'pending'}
+			<button type="button" disabled={cancelling} onclick={cancel}>{t('book.return.cancel')}</button>
 		{:else if view === 'refund'}
 			<a href="/">{t('book.return.again')}</a>
 		{/if}
@@ -81,7 +115,12 @@
 		border-top-color: var(--accent);
 	}
 
+	.error {
+		color: var(--danger);
+	}
+
 	.result.failed,
+	.result.cancelled,
 	.result.refund {
 		border-top-color: var(--danger);
 	}

@@ -41,7 +41,7 @@ const STATUSES: Record<string, PaymentStatus> = {
 };
 
 export function sumup(config: SumUpConfig): PaymentProvider {
-	async function call<T>(method: 'GET' | 'POST', path: string, body?: unknown): Promise<T> {
+	async function call<T>(method: 'GET' | 'POST' | 'DELETE', path: string, body?: unknown): Promise<T> {
 		let res: Response;
 		try {
 			res = await fetch(config.apiUrl + path, {
@@ -59,7 +59,7 @@ export function sumup(config: SumUpConfig): PaymentProvider {
 		}
 		const text = await res.text();
 		if (!res.ok) throw new PaymentProviderError(`SumUp ${method} ${path}: HTTP ${res.status} ${text.slice(0, 500)}`);
-		return JSON.parse(text) as T;
+		return (text ? JSON.parse(text) : undefined) as T;
 	}
 
 	return {
@@ -98,6 +98,11 @@ export function sumup(config: SumUpConfig): PaymentProvider {
 				// It ends up in Smartlaunch's booking text, so only plain codes are taken.
 				transactionCode: status === 'paid' && code && /^[A-Za-z0-9-]{1,40}$/.test(code) ? code : undefined
 			};
+		},
+
+		// "Deactivate a checkout": it moves to EXPIRED and can no longer be paid.
+		async cancelCheckout(providerRef: string): Promise<void> {
+			await call('DELETE', `/v0.1/checkouts/${encodeURIComponent(providerRef)}`);
 		},
 
 		async parseWebhook(request: Request): Promise<WebhookEvent | null> {

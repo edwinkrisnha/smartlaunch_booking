@@ -116,6 +116,10 @@ export const de: Record<keyof typeof en, Message> = {
 	'book.return.refund.title': 'Zahlung kam zu spät',
 	'book.return.refund': 'Deine Zahlung über {amount} kam nach Ablauf der Reservierung an, und die PCs waren inzwischen anderweitig gebucht. Das Center erstattet dir den Betrag. Bitte nenne die Bestellung {id}.',
 	'book.return.again': 'Erneut buchen',
+	'book.return.cancel': 'Buchung abbrechen',
+	'book.return.cancelled.title': 'Buchung abgebrochen',
+	'book.return.cancelled': 'Du hast die Zahlung abgebrochen, deshalb wurden die PCs wieder freigegeben. Du kannst erneut buchen.',
+	'book.cancel.busy': 'Deine Zahlung wird noch verarbeitet, deshalb kann die Buchung gerade nicht abgebrochen werden. Versuche es gleich noch einmal.',
 
 	'bookings.eyebrow': 'Dein Konto',
 	'bookings.title': 'Meine Buchungen',

@@ -18,7 +18,7 @@ export const GET: RequestHandler = endpoint(async ({ locals }) => {
 
 /**
  * POST { start, minutes, computerIds, orderCode? }. When bookings are paid online,
- * holds the stations and answers `{ paymentUrl }` for the browser to go to;
+ * holds the stations and answers `{ orderId, paymentUrl }` for the browser to go to;
  * otherwise books right away and answers `{ orderCode, quote }`.
  */
 export const POST: RequestHandler = endpoint(async ({ request, locals, url }) => {
@@ -33,7 +33,7 @@ export const POST: RequestHandler = endpoint(async ({ request, locals, url }) =>
 	return withLock(`book:${key}`, 60, async () => {
 		if (paidBookingsEnabled()) {
 			const booking = await prepareBooking(user, req);
-			return { paymentUrl: await startBookingPayment(user, booking, url.origin) };
+			return startBookingPayment(user, booking, url.origin);
 		}
 		return createBooking(user, req);
 	});

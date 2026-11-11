@@ -99,6 +99,7 @@ function toBookingOrder(row: OrderRow): BookingOrder {
 		amountCents: row.amount_cents,
 		currency: row.currency,
 		status: row.status === 'delivering' ? 'paid' : row.status,
+		cancelled: row.status === 'expired' && row.last_error === CANCELLED_BY_CUSTOMER,
 		bookingId: row.booking_id,
 		start: details.start ?? '',
 		end: details.end ?? '',
@@ -179,7 +180,11 @@ export function paidBookingsEnabled(): boolean {
  * checkout. Returns the payment page URL. The hold is released if the customer
  * doesn't pay within BOOKING_HOLD_MINUTES.
  */
-export async function startBookingPayment(user: SessionUser, booking: PreparedBooking, origin: string): Promise<string> {
+export async function startBookingPayment(
+	user: SessionUser,
+	booking: PreparedBooking,
+	origin: string
+): Promise<{ orderId: string; paymentUrl: string }> {
 	const provider = paymentProvider();
 	const quote = booking.quote;
 	if (!provider || !quote) throw new BookingError('topup.error.off', 404);
@@ -262,7 +267,7 @@ export async function startBookingPayment(user: SessionUser, booking: PreparedBo
 			.prepare('UPDATE orders SET provider_ref = ?, updated_at = ? WHERE id = ?')
 			.bind(checkout.providerRef, nowSeconds(), id)
 			.run();
-		return checkout.paymentUrl;
+		return { orderId: id, paymentUrl: checkout.paymentUrl };
 	} catch (err) {
 		console.error(`Booking order ${id}: creating the checkout failed`, err);
 		await sl.deleteBooking(hold.BookingId).catch((e) => console.error(`Booking order ${id}: releasing the hold failed`, e));
@@ -274,6 +279,41 @@ export async function startBookingPayment(user: SessionUser, booking: PreparedBo
 /** Cancel the unpaid hold of a booking order. Throws if the center can't be reached, so it is retried. */
 async function releaseHold(row: OrderRow): Promise<void> {
 	if (row.kind === 'booking' && row.booking_id) await sl.deleteBooking(row.booking_id);
+}
+
+/** last_error of a booking order the customer cancelled before paying. */
+const CANCELLED_BY_CUSTOMER = 'Cancelled by the customer';
+
+/**
+ * The customer gave up on paying: close the checkout so it can't be paid any more and
+ * release the stations right away instead of when the hold runs out. Does nothing if
+ * the order is no longer waiting for payment. A payment that went through anyway is kept.
+ */
+export async function cancelBookingOrder(id: string): Promise<void> {
+	const row = await getOrder(id);
+	// Without a checkout yet, it is still being started; the hold then simply runs out.
+	if (!row || row.kind !== 'booking' || row.status !== 'pending' || !row.provider_ref) return;
+	const provider = providerById(row.provider);
+	if (!provider) throw new PaymentProviderError(`Order ${id} was paid through "${row.provider}", which is not configured`);
+
+	try {
+		await provider.cancelCheckout(row.provider_ref);
+	} catch (err) {
+		// Usually it was paid or closed meanwhile; what the provider reports now decides.
+		console.error(`Booking order ${id}: closing the checkout failed`, err);
+	}
+	const state = await provider.getCheckout(row.provider_ref);
+	if (state.status === 'paid') {
+		await syncOrder(id);
+		return;
+	}
+	if (state.status === 'pending') throw new BookingError('book.cancel.busy', 409);
+
+	await releaseHold(row);
+	await db()
+		.prepare(`UPDATE orders SET status = 'expired', last_error = ?, updated_at = ? WHERE id = ? AND status = 'pending'`)
+		.bind(CANCELLED_BY_CUSTOMER, nowSeconds(), id)
+		.run();
 }
 
 /**

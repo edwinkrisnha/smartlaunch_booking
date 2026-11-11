@@ -5,6 +5,7 @@
 	import { formatMoney } from '#lib/money.js';
 	import { PLAN_NAMES, type Segment, type StationQuote } from '#lib/pricing.js';
 	import { placeSeats } from '#lib/seatmap.js';
+	import { UNPAID_ORDER_KEY } from '#lib/unpaid.js';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -186,15 +187,34 @@
 	let submitting = $state(false);
 	let redirecting = $state(false);
 
-	// Coming back from the payment page with the browser's Back button restores this page as it was left.
+	/**
+	 * Coming back from the payment page with the browser's Back button means the customer
+	 * didn't pay: cancel that order so its PCs are free again right away, not after the hold.
+	 */
+	async function releaseUnpaid() {
+		let id: string | null = null;
+		try {
+			id = sessionStorage.getItem(UNPAID_ORDER_KEY);
+			sessionStorage.removeItem(UNPAID_ORDER_KEY);
+		} catch {
+			// Storage blocked: the hold runs out by itself.
+		}
+		if (!id) return;
+		await fetch(`/api/bookings/${encodeURIComponent(id)}/cancel`, { method: 'POST' }).catch(() => {});
+	}
+
 	$effect(() => {
+		// Back restored this page as it was left...
 		const onShow = (event: PageTransitionEvent) => {
-			if (!event.persisted || !redirecting) return;
+			if (!event.persisted) return;
 			redirecting = false;
 			submitting = false;
-			refresh++;
+			releaseUnpaid().finally(() => refresh++);
 		};
 		addEventListener('pageshow', onShow);
+		// ...or loaded it afresh.
+		const nav = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
+		if (nav?.type === 'back_forward') releaseUnpaid().finally(() => refresh++);
 		return () => removeEventListener('pageshow', onShow);
 	});
 	let result = $state<{ kind: 'success' | 'error'; text: string } | null>(null);
@@ -225,12 +245,18 @@
 			const body = (await res.json().catch(() => ({}))) as ApiResponse<{
 				orderCode: string;
 				quote: StationQuote | null;
+				orderId: string;
 				paymentUrl: string;
 			}>;
 			if (!res.ok) throw new Error(body.error ?? t('book.failed'));
 
 			// Paid bookings: the PCs are now held; the booking is confirmed once the payment goes through.
 			if (body.paymentUrl) {
+				try {
+					if (body.orderId) sessionStorage.setItem(UNPAID_ORDER_KEY, body.orderId);
+				} catch {
+					// Storage blocked: coming back without paying leaves the hold to run out.
+				}
 				redirecting = true;
 				location.href = body.paymentUrl;
 				return;

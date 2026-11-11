@@ -54,6 +54,11 @@ export interface PaymentProvider {
 	createCheckout(request: CheckoutRequest): Promise<Checkout>;
 	getCheckout(providerRef: string): Promise<CheckoutState>;
 	/**
+	 * Stop the checkout accepting payment (the customer cancelled). Throws if the provider
+	 * refuses, e.g. because it was paid meanwhile; callers re-read it with getCheckout.
+	 */
+	cancelCheckout(providerRef: string): Promise<void>;
+	/**
 	 * Read a webhook request. Webhooks are never trusted as proof of payment: the
 	 * caller always re-reads the checkout with getCheckout. Returns null to ignore it.
 	 */

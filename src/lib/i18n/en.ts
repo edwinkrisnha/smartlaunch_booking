@@ -118,6 +118,10 @@ export const en = {
 	'book.return.refund.title': 'Payment came in too late',
 	'book.return.refund': 'Your payment of {amount} arrived after the hold ended, and the PCs had been booked by someone else. The center will refund you. Please mention order {id}.',
 	'book.return.again': 'Book again',
+	'book.return.cancel': 'Cancel booking',
+	'book.return.cancelled.title': 'Booking cancelled',
+	'book.return.cancelled': 'You cancelled the payment, so the PCs have been released. You can book again.',
+	'book.cancel.busy': 'Your payment is still being processed, so the booking can’t be cancelled right now. Try again in a moment.',
 
 	'bookings.eyebrow': 'Your account',
 	'bookings.title': 'My bookings',
