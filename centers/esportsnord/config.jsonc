@@ -5,8 +5,7 @@
 		"name": "eSports Nord",
 		"timezone": "Europe/Berlin",
 		"currency": "EUR",
-		"defaultLanguage": "en",
-		"theme": "esportsnord"
+		"defaultLanguage": "en"
 	},
 
 	"booking": {

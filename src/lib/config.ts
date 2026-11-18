@@ -1,6 +1,6 @@
-// A center's settings: prices, booking rules, payment limits and how the site
-// looks. Each center keeps them in one file, centers/<name>/config.jsonc, and the
-// CENTER variable picks which one a deployment uses (see #lib/server/center.js).
+// A center's settings: prices, booking rules and payment limits. Each center keeps
+// them in one file, centers/<name>/config.jsonc, next to its theme.css, and the
+// CENTER variable picks which folder a deployment uses (see #lib/server/center.js).
 //
 // This module parses and checks that file and fills in defaults. It has no runtime
 // imports, so `npm test` can load it as well as the site. Amounts in the file are
@@ -135,8 +135,6 @@ export interface CenterConfig {
 		timezone: string | null;
 		currency: string;
 		defaultLanguage: string;
-		/** Folder under src/themes. */
-		theme: string;
 	};
 	booking: BookingConfig;
 	/** null: the site shows no prices and takes no booking payments. */
@@ -551,6 +549,9 @@ export function parseCenterConfig(text: string, file = 'config.jsonc'): CenterCo
 	const r = new Reader();
 	const root = r.object(raw, '(top level)', ['center', 'booking', 'pricing', 'payments', 'signup']) ?? {};
 	const c = r.object(root.center, 'center', ['name', 'timezone', 'currency', 'defaultLanguage', 'theme']) ?? {};
+	if (c.theme !== undefined) {
+		r.fail('center.theme', 'no longer used: put theme.css (and favicon.svg) in the center\'s own folder, next to config.jsonc');
+	}
 
 	const timezone = c.timezone === undefined || c.timezone === null ? null : r.string(c.timezone, 'center.timezone', '');
 	if (timezone) {
@@ -570,8 +571,7 @@ export function parseCenterConfig(text: string, file = 'config.jsonc'): CenterCo
 			name: r.string(c.name, 'center.name', 'Smartlaunch'),
 			timezone: timezone || null,
 			currency,
-			defaultLanguage: r.string(c.defaultLanguage, 'center.defaultLanguage', 'en').toLowerCase(),
-			theme: r.string(c.theme, 'center.theme', 'default')
+			defaultLanguage: r.string(c.defaultLanguage, 'center.defaultLanguage', 'en').toLowerCase()
 		},
 		booking: readBooking(r, root.booking),
 		pricing: readPricing(r, root.pricing, currency),

@@ -27,21 +27,29 @@ You need a Smartlaunch server with the REST API turned on, a Cloudflare account,
 
 1. **Turn on the REST API** on the Smartlaunch server: set `RESTBaseAddressPort` in the server settings. If `RESTEnableSecurity` is on, note `RESTBasicUsername` and `RESTBasicPassword`. Bookings that are paid online need a server with `BookingStore` (`POST /bookings/create`, `PUT` and `DELETE /bookings/{id}`).
 2. **Make the API reachable from Cloudflare** under a hostname, for example with a Cloudflare Tunnel; see [Reaching the center server](#reaching-the-center-server).
-3. **Create the center's config:** copy `centers/default` to `centers/<your-center>` and edit `config.jsonc` (name, time zone, currency, booking rules, prices). Every setting is described in the file. See [Center settings](#center-settings).
-4. **Pick or make a theme** under `src/themes/` and name it in the config; see [Themes](#themes).
-5. **Check it:** `npm install && npm test`. The tests load every center's config and fail on any mistake in it.
-6. **Deploy** to Cloudflare, create the database and set the [environment variables](#environment-variables), including `CENTER=<your-center>`; see [Deploying](#deploying).
-7. **Optional:** turn on [online payments](#payments), and add a Cloudflare rate-limiting rule on `/login`, `/api/login`, `/signup` and `/api/signup` to slow down password guessing and bulk sign-ups.
+3. **Create the center's folder:** copy `centers/default` to `centers/<your-center>`. Edit `config.jsonc` (name, time zone, currency, booking rules, prices; every setting is described in the file) and `theme.css` and `favicon.svg` for the look. Anything you delete from the folder falls back to the default's. See [Center settings](#center-settings) and [Themes](#themes).
+4. **Check it:** `npm install && npm test`. The tests load every center's config and fail on any mistake in it.
+5. **Deploy** to Cloudflare, create the database and set the [environment variables](#environment-variables), including `CENTER=<your-center>`; see [Deploying](#deploying).
+6. **Optional:** turn on [online payments](#payments), and add a Cloudflare rate-limiting rule on `/login`, `/api/login`, `/signup` and `/api/signup` to slow down password guessing and bulk sign-ups.
 
 To try it first on your own machine, see [Running locally](#running-locally).
 
 ## Center settings
 
-Everything a center decides lives in one file, `centers/<name>/config.jsonc`. The `CENTER` variable picks which folder a deployment uses (`default` if unset). Credentials and connection details are not in the file; they are [environment variables](#environment-variables).
+Everything about a center lives in its folder, and the `CENTER` variable picks which folder a deployment uses (`default` if unset):
+
+```
+centers/<your-center>/
+	config.jsonc    settings: name, time zone, booking rules, prices, payments, sign-up
+	theme.css       the look; see Themes
+	favicon.svg     the browser tab icon
+```
+
+A file the folder doesn't have comes from `centers/default`: a center can have only a `theme.css` and use the default settings, or only a `config.jsonc` and the default look. Credentials and connection details are not in the folder; they are [environment variables](#environment-variables).
 
 | Section | What it sets |
 | --- | --- |
-| `center` | Name in the header, time zone, currency, default language, theme |
+| `center` | Name in the header, time zone, currency, default language |
 | `booking` | Shortest and longest booking, the durations offered, arrival time step, earliest start, PCs per booking, upcoming bookings per customer, PCs that can't be booked online |
 | `pricing` | Price plans, hourly rates and peak times, PCs priced differently (zones), which user group gets which plan, whole rooms. `null` shows no prices |
 | `payments` | Top-up amounts and limits, how long PCs stay held while a customer pays, limits on unpaid holds |
@@ -51,7 +59,7 @@ Everything a center decides lives in one file, `centers/<name>/config.jsonc`. Th
 
 ```jsonc
 {
-	"center": { "name": "Game Zone", "timezone": "Asia/Jakarta", "currency": "IDR", "theme": "default" },
+	"center": { "name": "Game Zone", "timezone": "Asia/Jakarta", "currency": "IDR" },
 	"booking": { "durations": [1, 2, 3, 4], "excludedPcs": ["PC29", "PC30"] }
 }
 ```
@@ -72,7 +80,6 @@ Every setting is optional unless marked **required**. Defaults are the ones `cen
 | `timezone` | `null` | IANA time zone, e.g. `"Europe/Berlin"` or `"Asia/Jakarta"`. Needed for the server to reject bookings before the earliest start, and for dates on the top-up page |
 | `currency` | `"EUR"` | Three-letter ISO code of all prices and payments; must match the payment account |
 | `defaultLanguage` | `"en"` | `en`, `de` or `da`, for visitors whose browser asks for none of them |
-| `theme` | `"default"` | Folder under `src/themes`; see [Themes](#themes) |
 
 **`booking`**
 
@@ -212,7 +219,7 @@ How prices are worked out:
 - **The server always works out the price.** The browser never sends an amount.
 - **Whole rooms** (`rooms`) are priced by the engine but not offered on the site yet: capacity × the room's seat rate, for the whole hours the room allows, plus optional catering per guest.
 
-The repo also contains a real center as an example: `centers/esportsnord` (with the `esportsnord` theme), whose price list has five plans, peak times, a members' low-rate window, guest and one-discount rules, and rooms. `npm test` checks it against that center's price tables. It is only an example: no code depends on it, though this repo's `wrangler.jsonc` deploys it.
+The repo also contains a real center as an example: `centers/esportsnord`, with its own settings and theme, whose price list has five plans, peak times, a members' low-rate window, guest and one-discount rules, and rooms. `npm test` checks it against that center's price tables. It is only an example: no code depends on it, though this repo's `wrangler.jsonc` deploys it.
 
 ## Environment variables
 
@@ -390,8 +397,8 @@ ddev exec npm test          # any npm script works through ddev exec
 
 | Message | Cause |
 | --- | --- |
-| Every page shows an error; the log names `centers/<name>/config.jsonc` | The center's config has a mistake (each problem is listed), or `CENTER` names a folder that doesn't exist |
-| Site shows "Smartlaunch" and default settings | `CENTER` isn't set, so the `default` config is used (on Pages, set it in the dashboard) |
+| Every page shows an error; the log names `centers/<name>/config.jsonc` | The center's config has a mistake; each problem is listed |
+| Site shows "Smartlaunch" and the default look | `CENTER` isn't set (on Pages, set it in the dashboard), or it's misspelled: the log says `centers/<name>/config.jsonc not found; using centers/default/config.jsonc` |
 | `… is set but no longer read` in the log | An old settings variable is still set; move its value into the config and delete it |
 | "The booking service is misconfigured" | On Cloudflare with an IP address in `SL_API_URL`: Cloudflare blocks bare IPs (error 1003); use a hostname. Otherwise the server rejected `SL_API_USERNAME` / `SL_API_PASSWORD`. The logs say which |
 | "The center server could not be reached" | `SL_API_URL` is wrong, the server is down, or a firewall blocks the port |
@@ -406,16 +413,16 @@ ddev exec npm test          # any npm script works through ddev exec
 
 ### Themes
 
-The site's look comes from a theme in `src/themes/<name>/`, chosen with `center.theme` in the config. If the folder doesn't exist, the `default` theme is used and the server logs a warning.
+The site's look comes from the center's folder: `theme.css` and `favicon.svg` next to `config.jsonc`. A center without its own `theme.css` or `favicon.svg` uses the one in `centers/default`.
 
-| Theme | Look |
+| Center | Look |
 | --- | --- |
 | `default` | Neutral: system fonts, blue accent, rounded corners; follows the visitor's light/dark setting |
 | `esportsnord` | The example center's brand: red header, slanted buttons and panel cuts, hazard stripes, display fonts; dark only. A good starting point for a heavily styled theme |
 
-A theme folder has a `theme.css` (required) that sets CSS variables for colours, fonts and shapes and can add its own rules, an optional `favicon.svg`, and any images the CSS uses (with relative `url(...)` paths). `src/themes/default/theme.css` defines every variable with comments, so it doubles as the reference.
+`theme.css` sets CSS variables for colours, fonts and shapes and can add its own rules. Images it uses go in the same folder, with relative `url(...)` paths. `centers/default/theme.css` defines every variable with comments, so it doubles as the reference.
 
-To make your own, create `src/themes/mytheme/theme.css`, start from the default theme and override what you want:
+To make your own, write `centers/<your-center>/theme.css` that starts from the default theme and overrides what you want:
 
 ```css
 /* Web fonts, if any, must come first. */
@@ -433,9 +440,9 @@ To make your own, create `src/themes/mytheme/theme.css`, start from the default 
 }
 ```
 
-Then set `"theme": "mytheme"` in the center's config and rebuild. To change an existing theme, copy it under a new name first, so updates to the original don't overwrite your changes. A theme that loads fonts or images from anywhere other than Google Fonts needs that host added to the Content-Security-Policy in `vite.config.ts`.
+Then rebuild; themes are bundled into the build. To base your look on another center's, import its file instead (`@import '../esportsnord/theme.css';`). A theme that loads fonts or images from anywhere other than Google Fonts needs that host added to the Content-Security-Policy in `vite.config.ts`.
 
-To use a licensed font that isn't on Google Fonts, put its files in the theme folder, add an `@font-face` for them in `theme.css`, and put that family first in `--font-display`.
+To use a licensed font that isn't on Google Fonts, put its files in the center's folder, add an `@font-face` for them in `theme.css`, and put that family first in `--font-display`.
 
 ### Languages
 

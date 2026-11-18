@@ -25,7 +25,7 @@ export const variables = defineEnvVars({
 	},
 	CENTER: {
 		description:
-			'Which center this deployment serves: the folder under centers/ whose config.jsonc holds its prices, booking rules and look. Defaults to "default".',
+			'Which center this deployment serves: the folder under centers/ with its config.jsonc, theme.css and favicon.svg (missing files come from centers/default). Defaults to "default".',
 		schema: (value) => optional(value)?.trim()
 	},
 	SESSION_SECRET: {

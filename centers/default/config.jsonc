@@ -2,6 +2,9 @@
 // copy, and set CENTER=<your-center> on the deployment. Every setting is optional:
 // one you leave out gets the value shown here.
 //
+// The center's look is in the same folder: theme.css and favicon.svg. Delete them
+// from your copy to use this default look.
+//
 // Secrets and connection details are NOT in this file; they stay in environment
 // variables (SL_API_URL, SL_API_USERNAME, SL_API_PASSWORD, SESSION_SECRET,
 // PAYMENT_PROVIDER, SUMUP_*, TURNSTILE_*), see .env.example.
@@ -19,9 +22,7 @@
 		// ISO currency of prices and payments.
 		"currency": "EUR",
 		// Language for visitors whose browser asks for none of the supported ones: en, de or da.
-		"defaultLanguage": "en",
-		// Folder under src/themes that styles the site.
-		"theme": "default"
+		"defaultLanguage": "en"
 	},
 
 	"booking": {

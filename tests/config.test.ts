@@ -3,13 +3,13 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { ConfigError, parseCenterConfig, parseJsonc } from '../src/lib/config.ts';
 import { planForGroup, quoteStations, zoneOf } from '../src/lib/pricing.ts';
 
 const centersDir = new URL('../centers/', import.meta.url);
 
-for (const name of readdirSync(centersDir)) {
+for (const name of readdirSync(centersDir).filter((n) => existsSync(new URL(`${n}/config.jsonc`, centersDir)))) {
 	test(`centers/${name}/config.jsonc is valid`, () => {
 		const file = `centers/${name}/config.jsonc`;
 		parseCenterConfig(readFileSync(new URL(`${name}/config.jsonc`, centersDir), 'utf8'), file);
@@ -29,6 +29,16 @@ test('the commented pricing example in centers/default is valid', () => {
 		pricing.zones.map((z) => z.id),
 		['vip', 'console']
 	);
+});
+
+test('the default center has the config and theme every other center falls back to', () => {
+	assert.ok(existsSync(new URL('default/config.jsonc', centersDir)));
+	assert.ok(existsSync(new URL('default/theme.css', centersDir)));
+	assert.ok(existsSync(new URL('default/favicon.svg', centersDir)));
+});
+
+test('the old theme setting points to the center folder', () => {
+	assert.match(problems({ center: { theme: 'mytheme' } })[0], /^center\.theme: no longer used: put theme\.css/);
 });
 
 /** The problems parseCenterConfig reports for `config`. */

@@ -2,12 +2,12 @@
  * Default theme: neutral, light and dark, system fonts.
  *
  * This file defines every variable the app uses, so it is also the reference
- * for writing your own theme. To make one:
- *   1. Create src/themes/<name>/theme.css starting with
+ * for writing your own theme. To make one for your center:
+ *   1. Create centers/<name>/theme.css starting with
  *        @import '../default/theme.css';
  *      and override only the variables you want to change.
- *   2. Optionally add src/themes/<name>/favicon.svg.
- *   3. Set THEME=<name> in .env (or in Cloudflare Pages), then rebuild.
+ *   2. Optionally add centers/<name>/favicon.svg.
+ *   3. Rebuild. A center without a theme.css uses this one.
  * A theme can also add its own rules after the variables, and reference
  * images next to it with relative url(...) paths.
  */

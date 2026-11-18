@@ -1,7 +1,7 @@
 /*
  * Base styles: structure only. Every colour, font and shape comes from the
- * active theme (src/themes/<name>/theme.css), which defines the variables
- * used below. See src/themes/default/theme.css for the full list.
+ * center's theme (centers/<name>/theme.css), which defines the variables
+ * used below. See centers/default/theme.css for the full list.
  */
 
 * {
