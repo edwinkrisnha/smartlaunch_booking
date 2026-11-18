@@ -294,6 +294,19 @@ npm run check               # type check
 npm run gen                 # regenerate worker-configuration.d.ts after editing wrangler.jsonc
 ```
 
+### With DDEV
+
+Instead of installing Node yourself, you can run the app in [DDEV](https://ddev.com) (Node 24, no MySQL container; D1 stays local SQLite under `.wrangler/`). Do step 1 and create `.env` as in step 2, then:
+
+```sh
+ddev start                  # installs packages, applies local migrations, starts Vite
+                            # https://smartlaunch-booking.ddev.site:5173
+ddev preview                # Workers runtime: https://smartlaunch-booking.ddev.site:4173 (/__scheduled runs the job)
+ddev exec npm test          # any npm script works through ddev exec
+```
+
+`SL_API_URL` is called from inside the container, so use the server's LAN address, not `localhost`. Vite restarts by itself after you edit `.env`. If it doesn't, run `ddev restart`. Run `wrangler login`, remote migrations and deploys on the host.
+
 **How the Worker is put together:** the SvelteKit adapter writes the app's Worker to `.svelte-kit/cloudflare/_worker.js` (configured by `wrangler.sveltekit.jsonc`, read only by the adapter). The deployed Worker, configured in `wrangler.jsonc`, starts at `worker/index.js`. That file passes requests to the app's Worker and adds the scheduled job, which calls `/api/payments/sweep` with `SESSION_SECRET` as its key.
 
 ### Troubleshooting

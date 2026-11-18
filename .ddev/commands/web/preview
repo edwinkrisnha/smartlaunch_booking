@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+
+## Description: Build and run the app in the Workers runtime (Wrangler), including the scheduled job
+## Usage: preview
+## Example: "ddev preview"
+
+set -e
+cd /var/www/html
+npm run build
+echo "Open https://${DDEV_HOSTNAME}:4173 (scheduled job: /__scheduled)"
+exec npx wrangler dev --port 4173 --ip 0.0.0.0 --test-scheduled

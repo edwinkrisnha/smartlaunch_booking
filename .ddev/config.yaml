@@ -1,0 +1,35 @@
+# DDEV runs only the Node dev server here. The app has no MySQL/MariaDB: its database is
+# Cloudflare D1, which Wrangler emulates locally with SQLite under .wrangler/.
+name: smartlaunch-booking
+type: generic
+webserver_type: generic
+docroot: ""
+nodejs_version: "24"
+omit_containers: [db]
+
+# `npm run dev` (Vite) at https://smartlaunch-booking.ddev.site:5173
+web_extra_daemons:
+  - name: vite
+    command: "npm run dev -- --host 0.0.0.0 --port 5173 --strictPort"
+    directory: /var/www/html
+
+web_extra_exposed_ports:
+  - name: vite
+    container_port: 5173
+    http_port: 5172
+    https_port: 5173
+  # `ddev preview` (Wrangler, the real Workers runtime) at https://smartlaunch-booking.ddev.site:4173
+  - name: wrangler
+    container_port: 4173
+    http_port: 4172
+    https_port: 4173
+
+web_environment:
+  # Vite rejects unknown Host headers; allow the DDEV hostnames.
+  - __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS=.ddev.site
+  - WRANGLER_SEND_METRICS=false
+
+hooks:
+  post-start:
+    - exec: "[ -d node_modules ] || npm ci"
+    - exec: "npm run db:migrate:local"
