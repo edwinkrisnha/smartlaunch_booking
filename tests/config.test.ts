@@ -170,6 +170,16 @@ test('zones: PCs priced by group or name', () => {
 	);
 });
 
+test('ids, rates and room sizes are required', () => {
+	assert.deepEqual(problems({ pricing: { plans: [{ rate: 1 }] } }), ['pricing.plans[0].id: is required']);
+	assert.deepEqual(problems({ pricing: { plans: [{ id: 'a' }] } }), ['pricing.plans[0].rate: must be an amount of 0 or more, e.g. 2.5']);
+	assert.deepEqual(problems({ pricing: { zones: [{ pcs: ['1'] }], plans: [{ id: 'a', rate: 1 }] } }), ['pricing.zones[0].id: is required']);
+	assert.deepEqual(problems({ pricing: { plans: [{ id: 'a', rate: 1 }], rooms: [{ id: 'r', rate: 1 }] } }), [
+		'pricing.rooms[0].hours: needs at least one duration',
+		'pricing.rooms[0].capacity: is required'
+	]);
+});
+
 test('zone mistakes are reported', () => {
 	assert.match(problems({ pricing: { zones: [{ id: 'vip' }], plans: [{ id: 'a', rate: 1 }] } })[0], /zones\[0\]: needs "groups" or "pcs"/);
 	assert.match(

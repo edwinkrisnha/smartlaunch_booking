@@ -217,6 +217,13 @@ class Reader {
 		return value.trim();
 	}
 
+	/** A setting that must be given. */
+	required(value: unknown, path: string): boolean {
+		if (value !== undefined) return true;
+		this.fail(path, 'is required');
+		return false;
+	}
+
 	boolean(value: unknown, path: string, fallback: boolean): boolean {
 		if (value === undefined) return fallback;
 		if (typeof value !== 'boolean') return this.fail(path, 'must be true or false') ?? fallback;
@@ -347,6 +354,7 @@ function readPricing(r: Reader, value: unknown, currency: string): PricingConfig
 		const path = `pricing.zones[${i}]`;
 		const z = r.object(raw, path, ['id', 'name', 'groups', 'pcs']);
 		if (!z) continue;
+		r.required(z.id, `${path}.id`);
 		const id = r.string(z.id, `${path}.id`, '');
 		if (id && !ID_RE.test(id)) r.fail(`${path}.id`, 'use letters, digits, "-" and "_" only');
 		if (zones.some((q) => q.id === id)) r.fail(`${path}.id`, `"${id}" is used by another zone`);
@@ -367,12 +375,13 @@ function readPricing(r: Reader, value: unknown, currency: string): PricingConfig
 		const path = `pricing.plans[${i}]`;
 		const p = r.object(raw, path, ['id', 'name', 'groups', 'rate', 'rates', 'zones']);
 		if (!p) continue;
+		r.required(p.id, `${path}.id`);
 		const id = r.string(p.id, `${path}.id`, '');
 		if (id && !ID_RE.test(id)) r.fail(`${path}.id`, 'use letters, digits, "-" and "_" only');
 		if (plans.some((q) => q.id === id)) r.fail(`${path}.id`, `"${id}" is used by another plan`);
 		const name = r.string(p.name, `${path}.name`, id);
 		// By default a group named like the plan's id or name gives the plan.
-		const groups = (p.groups === undefined ? [id, name] : (r.array(p.groups, `${path}.groups`) ?? []))
+		const groups = (p.groups === undefined ? [id, name].filter(Boolean) : (r.array(p.groups, `${path}.groups`) ?? []))
 			.map((g, j) => (typeof g === 'string' && g.trim() ? g.trim().toLowerCase() : r.fail(`${path}.groups[${j}]`, 'must be a group name')))
 			.filter((g): g is string => g !== undefined);
 		for (const g of new Set(groups)) {
@@ -405,14 +414,15 @@ function readPricing(r: Reader, value: unknown, currency: string): PricingConfig
 		const path = `pricing.rooms[${i}]`;
 		const m = r.object(raw, path, ['id', 'name', 'capacity', 'hours', 'rate', 'rates', 'cateringPerGuest']);
 		if (!m) continue;
+		r.required(m.id, `${path}.id`);
 		const id = r.string(m.id, `${path}.id`, '');
 		if (rooms.some((q) => q.id === id)) r.fail(`${path}.id`, `"${id}" is used by another room`);
-		const hours = (r.array(m.hours, `${path}.hours`) ?? []).map((h, j) => r.number(h, `${path}.hours[${j}]`, 1, { min: 1, integer: true }));
+		const hours = (m.hours === undefined ? [] : (r.array(m.hours, `${path}.hours`) ?? [])).map((h, j) => r.number(h, `${path}.hours[${j}]`, 1, { min: 1, integer: true }));
 		if (hours.length === 0) r.fail(`${path}.hours`, 'needs at least one duration');
 		rooms.push({
 			id,
 			name: r.string(m.name, `${path}.name`, id),
-			capacity: r.number(m.capacity, `${path}.capacity`, 1, { min: 1, integer: true }),
+			capacity: r.required(m.capacity, `${path}.capacity`) ? r.number(m.capacity, `${path}.capacity`, 1, { min: 1, integer: true }) : 1,
 			hours,
 			seatRates: r.rateTable(m, path, periods),
 			cateringPerGuest: r.money(m.cateringPerGuest, `${path}.cateringPerGuest`, 0)
