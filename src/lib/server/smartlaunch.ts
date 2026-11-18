@@ -66,6 +66,11 @@ export interface RawComputer {
 	ConsoleType: string;
 }
 
+export interface RawComputerGroup {
+	ComputerGroupID: string;
+	Name: string;
+}
+
 export interface RawLayoutGroup {
 	LayoutGroupID: string;
 	Name: string;
@@ -215,6 +220,11 @@ export async function addMoney(username: string, amount: number, orderCode: stri
 /** GET /usergroups */
 export async function getUserGroups(): Promise<RawUserGroup[]> {
 	return (await request<RawUserGroup[] | null>('GET', '/usergroups')) ?? [];
+}
+
+/** GET /computergroups */
+export async function getComputerGroups(): Promise<RawComputerGroup[]> {
+	return (await request<RawComputerGroup[] | null>('GET', '/computergroups')) ?? [];
 }
 
 /** GET /layoutgroups */

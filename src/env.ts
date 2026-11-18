@@ -23,65 +23,19 @@ export const variables = defineEnvVars({
 			'Optional. Appended as ?licenseemail= on every request, for servers reached through a relay that routes by license.',
 		schema: optional
 	},
+	CENTER: {
+		description:
+			'Which center this deployment serves: the folder under centers/ whose config.jsonc holds its prices, booking rules and look. Defaults to "default".',
+		schema: (value) => optional(value)?.trim()
+	},
 	SESSION_SECRET: {
 		description: 'Random string (32+ characters) used to sign the login cookie. Store it as a Cloudflare secret.',
 		schema: optional
 	},
-	CENTER_TIMEZONE: {
-		description:
-			'Optional IANA time zone of the center, e.g. Asia/Jakarta. When set, bookings that start in the past are rejected server-side.',
-		schema: optional
-	},
-	PUBLIC_CENTER_NAME: {
-		public: true,
-		description: 'Name shown in the page header.',
-		schema: (value) => optional(value) ?? 'Smartlaunch'
-	},
-	PUBLIC_ALLOW_SIGNUP: {
-		public: true,
-		description: 'Whether visitors can create an account on the site. "false" turns sign-up off; on by default.',
-		schema: (value) => optional(value)?.trim().toLowerCase() !== 'false'
-	},
-	DEFAULT_LANGUAGE: {
-		description:
-			'Language for visitors whose browser asks for none of the supported ones: en, de or da. Defaults to en.',
-		schema: (value) => optional(value)?.trim().toLowerCase()
-	},
-	EXCLUDED_PCS: {
-		description:
-			'Optional. PCs customers can never book online, separated by semicolons, by name or ID, e.g. "PC29;PC30". They show as unavailable on the floor plan.',
-		schema: (value) =>
-			new Set(
-				(optional(value) ?? '')
-					.split(';')
-					.map((s) => s.trim().toLowerCase())
-					.filter(Boolean)
-			)
-	},
 	PAYMENT_PROVIDER: {
 		description:
-			'Payment provider for online top-ups: "sumup". Leave empty to turn online payments off.',
+			'Payment provider for online top-ups and paid bookings: "sumup". Leave empty to turn online payments off.',
 		schema: (value) => optional(value)?.trim().toLowerCase()
-	},
-	PAYMENT_CURRENCY: {
-		description: 'ISO currency code for payments, e.g. EUR or DKK. Defaults to EUR.',
-		schema: (value) => optional(value)?.trim().toUpperCase() ?? 'EUR'
-	},
-	TOPUP_AMOUNTS: {
-		description: 'Comma-separated quick-pick top-up amounts, e.g. "10,20,50". Defaults to 10,20,50.',
-		schema: (value) =>
-			(optional(value) ?? '10,20,50')
-				.split(',')
-				.map((a) => Number(a.trim()))
-				.filter((a) => Number.isFinite(a) && a > 0)
-	},
-	TOPUP_MIN: {
-		description: 'Smallest top-up amount a customer can enter. Defaults to 5.',
-		schema: (value) => Number(optional(value) ?? 5)
-	},
-	TOPUP_MAX: {
-		description: 'Largest top-up amount a customer can enter. Defaults to 200.',
-		schema: (value) => Number(optional(value) ?? 200)
 	},
 	SUMUP_API_KEY: {
 		description: 'SumUp secret API key (SumUp Dashboard > Developers). Store it as a Cloudflare secret.',
@@ -95,23 +49,6 @@ export const variables = defineEnvVars({
 		description: 'Optional. SumUp API base URL; only change it for testing against a mock. Defaults to https://api.sumup.com.',
 		schema: (value) => (optional(value) ?? 'https://api.sumup.com').replace(/\/+$/, '')
 	},
-	PRICE_RULES: {
-		description:
-			'Booking price rules to show and record with each booking: "r7" (eSports Nord HUB, revision R7; "r6" also works). Leave empty to show no prices.',
-		schema: (value) => optional(value)?.trim().toLowerCase()
-	},
-	PLAN_GROUPS: {
-		description:
-			'Optional. Which Smartlaunch user group gives which price plan, e.g. "campus=Campus Members,pro=Pro,alpha=Alpha,team=TEAM". By default a group named like the plan (campus, pro, alpha, team) gives that plan; anyone else pays Rookie rates.',
-		schema: (value) => {
-			const map = new Map<string, string>();
-			for (const pair of (optional(value) ?? '').split(',')) {
-				const [plan, group] = pair.split('=').map((s) => s?.trim() ?? '');
-				if (plan && group) map.set(group.toLowerCase(), plan.toLowerCase());
-			}
-			return map;
-		}
-	},
 	TURNSTILE_SITE_KEY: {
 		description:
 			'Optional. Cloudflare Turnstile site key; with TURNSTILE_SECRET_KEY it adds a "not a robot" check to sign-up.',
@@ -121,9 +58,18 @@ export const variables = defineEnvVars({
 		description: 'Optional. Cloudflare Turnstile secret key. Store it as a Cloudflare secret.',
 		schema: (value) => optional(value)?.trim()
 	},
-	THEME: {
-		description:
-			'Folder name under src/themes to style the site with, e.g. "esportsnord". Falls back to "default" if unset or missing.',
-		schema: (value) => optional(value)?.trim()
-	}
+
+	// Moved into centers/<CENTER>/config.jsonc. Declared only so a leftover value can be reported.
+	CENTER_TIMEZONE: { description: 'No longer read: set it in centers/<CENTER>/config.jsonc instead.', schema: optional },
+	PUBLIC_CENTER_NAME: { description: 'No longer read: set it in centers/<CENTER>/config.jsonc instead.', schema: optional },
+	PUBLIC_ALLOW_SIGNUP: { description: 'No longer read: set it in centers/<CENTER>/config.jsonc instead.', schema: optional },
+	DEFAULT_LANGUAGE: { description: 'No longer read: set it in centers/<CENTER>/config.jsonc instead.', schema: optional },
+	EXCLUDED_PCS: { description: 'No longer read: set it in centers/<CENTER>/config.jsonc instead.', schema: optional },
+	PAYMENT_CURRENCY: { description: 'No longer read: set it in centers/<CENTER>/config.jsonc instead.', schema: optional },
+	TOPUP_AMOUNTS: { description: 'No longer read: set it in centers/<CENTER>/config.jsonc instead.', schema: optional },
+	TOPUP_MIN: { description: 'No longer read: set it in centers/<CENTER>/config.jsonc instead.', schema: optional },
+	TOPUP_MAX: { description: 'No longer read: set it in centers/<CENTER>/config.jsonc instead.', schema: optional },
+	PRICE_RULES: { description: 'No longer read: set it in centers/<CENTER>/config.jsonc instead.', schema: optional },
+	PLAN_GROUPS: { description: 'No longer read: set it in centers/<CENTER>/config.jsonc instead.', schema: optional },
+	THEME: { description: 'No longer read: set it in centers/<CENTER>/config.jsonc instead.', schema: optional }
 });

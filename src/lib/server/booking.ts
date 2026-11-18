@@ -1,18 +1,16 @@
-import { CENTER_TIMEZONE, EXCLUDED_PCS } from '$app/env/private';
 import { LocalizedError, translate, type Locale, type MessageKey, type Params } from '#lib/i18n/index.js';
 import { formatLocal, nowInZone, parseLocal, toCompact } from '#lib/time.js';
 import { GENDERS, type Booking, type BookingRequest, type Gender, type Layout, type Pc, type Seat, type SessionUser } from '#lib/types.js';
 import { quoteStations, type StationQuote } from '#lib/pricing.js';
+import { center } from './center';
 import { reached, resetLimit, throttle } from './limits';
-import { planOf, pricingEnabled } from './pricing';
+import { planOf, pricing, stationZones } from './pricing';
 import * as sl from './smartlaunch';
 import { verifyTurnstile } from './turnstile';
 
-export const MIN_MINUTES = 30;
-export const MAX_MINUTES = 24 * 60;
-const MAX_PCS_PER_BOOKING = 50;
-/** Upcoming bookings one customer may have at once, held or paid. */
-export const MAX_UPCOMING_BOOKINGS = 10;
+// Booking rules (lengths, limits, earliest start, excluded PCs) come from the center
+// config; see centers/default/config.jsonc. The limits below protect the site itself.
+const rules = center.booking;
 
 /** Failed logins per username, and attempts per IP address, within LOGIN_WINDOW. */
 const LOGIN_FAILURES_PER_USER = 10;
@@ -99,7 +97,6 @@ const EMAIL_RE = /^[^\s@"]+@[^\s@"']+\.[^\s@"']+$/;
 const PHONE_RE = /^\+?[0-9 ()-]{6,20}$/;
 // Covers German (12345), Danish (1234) and most other postcodes.
 const ZIP_RE = /^[A-Za-z0-9 -]{3,10}$/;
-const MIN_AGE = 5;
 
 /**
  * Smartlaunch keeps gender in Users.InfoSex: 0 = female, 1 = male. It has no
@@ -131,7 +128,7 @@ export function validateSignup(input: SignupInput): SignupErrors {
 
 	const born = parseLocal(`${input.birthday}T00:00`);
 	const now = new Date();
-	const youngest = Date.UTC(now.getUTCFullYear() - MIN_AGE, now.getUTCMonth(), now.getUTCDate()) / 1000;
+	const youngest = Date.UTC(now.getUTCFullYear() - center.signup.minAge, now.getUTCMonth(), now.getUTCDate()) / 1000;
 	const oldest = Date.UTC(now.getUTCFullYear() - 110, 0, 1) / 1000;
 	if (born === null || born > youngest || born < oldest) {
 		fail('birthday', 'signup.error.birthday');
@@ -225,20 +222,28 @@ export async function listSeats(pcs: Pc[] | Promise<Pc[]> = listPcs()): Promise<
 
 export class BookingError extends LocalizedError {}
 
+/** Earliest booking start for wall-clock `now`: the first start-grid time after now + the lead time. */
+export function earliestStart(now: number): number {
+	const grid = rules.startGridMinutes * 60;
+	return (Math.floor((now + rules.leadMinutes * 60) / grid) + 1) * grid;
+}
+
 function timeWindow(start: string, minutes: number): { from: number; to: number } {
 	const from = parseLocal(start);
 	if (from === null) throw new BookingError('error.start');
-	if (!Number.isInteger(minutes) || minutes < MIN_MINUTES || minutes > MAX_MINUTES) {
-		throw new BookingError('error.duration', 400, { min: MIN_MINUTES, max: MAX_MINUTES });
+	if (!Number.isInteger(minutes) || minutes < rules.minMinutes || minutes > rules.maxMinutes) {
+		throw new BookingError('error.duration', 400, { min: rules.minMinutes, max: rules.maxMinutes });
 	}
 	return { from, to: from + minutes * 60 };
 }
 
-/** IDs of the computers EXCLUDED_PCS names (by name or ID, ignoring case); customers can't book them. */
+const excludedPcs = new Set(rules.excludedPcs);
+
+/** IDs of the computers booking.excludedPcs names (by name or ID, ignoring case); customers can't book them. */
 function excludedIds(computers: sl.RawComputer[]): string[] {
-	if (EXCLUDED_PCS.size === 0) return [];
+	if (excludedPcs.size === 0) return [];
 	return computers
-		.filter((c) => EXCLUDED_PCS.has(String(c.ComputerID).toLowerCase()) || EXCLUDED_PCS.has((c.Name ?? '').trim().toLowerCase()))
+		.filter((c) => excludedPcs.has(String(c.ComputerID).toLowerCase()) || excludedPcs.has((c.Name ?? '').trim().toLowerCase()))
 		.map((c) => String(c.ComputerID));
 }
 
@@ -246,7 +251,7 @@ function excludedIds(computers: sl.RawComputer[]): string[] {
 async function unavailableIds(startdate: string, enddate: string): Promise<string[]> {
 	const [booked, computers] = await Promise.all([
 		sl.getBookedComputerIds(startdate, enddate),
-		EXCLUDED_PCS.size > 0 ? sl.getComputers() : Promise.resolve([])
+		excludedPcs.size > 0 ? sl.getComputers() : Promise.resolve([])
 	]);
 	return [...new Set([...booked, ...excludedIds(computers)])];
 }
@@ -267,7 +272,7 @@ export async function getUnavailableRaw(startdate: string, enddate: string): Pro
 	const to = parseLocal(compactToLocal(enddate));
 	if (from === null || to === null) throw new BookingError('error.compactDates');
 	// Same longest window as a booking, so one request can't make the center scan months of bookings.
-	if (to - from > MAX_MINUTES * 60) throw new BookingError('error.duration', 400, { min: MIN_MINUTES, max: MAX_MINUTES });
+	if (to - from > rules.maxMinutes * 60) throw new BookingError('error.duration', 400, { min: rules.minMinutes, max: rules.maxMinutes });
 	return unavailableIds(startdate, enddate);
 }
 
@@ -309,35 +314,50 @@ export async function listBookings(owner?: SessionUser): Promise<Booking[]> {
 
 /**
  * Price of booking `stations` stations for this customer, or null when the
- * center shows no prices. Their plan rate covers one station; it is not given
- * again while they already have a booking at that time (one discounted session
- * per member), and further stations are charged at the Rookie rate.
+ * center shows no prices. With pricing.oneDiscountAtATime, their plan rate is not
+ * given again while they already have a booking at that time; with a guest plan,
+ * further stations are charged at that plan's rate.
  */
 async function quoteFor(
 	account: sl.RawUser,
 	existing: Booking[],
 	from: number,
 	to: number,
-	stations: number
+	stations: (string | null)[]
 ): Promise<StationQuote | null> {
-	if (!pricingEnabled) return null;
+	if (!pricing) return null;
 	const plan = await planOf(account);
 	const overlapping = existing.some((b) => {
 		const bFrom = parseLocal(b.start);
 		const bTo = parseLocal(b.end);
 		return bFrom !== null && bTo !== null && bFrom < to && bTo > from;
 	});
-	return quoteStations(plan, from, to, stations, overlapping && plan !== 'rookie');
+	const discountInUse = pricing.oneDiscountAtATime && overlapping && plan !== pricing.defaultPlan;
+	return quoteStations(pricing, plan, from, to, stations, discountInUse);
 }
 
-export async function getQuote(user: SessionUser, start: string, minutes: number, stations: number): Promise<StationQuote | null> {
+/** Price of booking the PCs `computerIds` for this customer, or null when the center shows no prices. */
+export async function getQuote(user: SessionUser, start: string, minutes: number, computerIds: string[]): Promise<StationQuote | null> {
 	const { from, to } = timeWindow(start, minutes);
-	if (!Number.isInteger(stations) || stations < 1 || stations > MAX_PCS_PER_BOOKING) {
-		throw new BookingError('error.tooManyPcs', 400, { max: MAX_PCS_PER_BOOKING });
-	}
-	if (!pricingEnabled) return null;
-	const [account, existing] = await Promise.all([activeAccount(user), listBookings(user)]);
-	return quoteFor(account, existing, from, to, stations);
+	const ids = checkedIds(computerIds);
+	if (!pricing) return null;
+	const zonesUsed = pricing.zones.length > 0;
+	const [account, existing, known] = await Promise.all([
+		activeAccount(user),
+		listBookings(user),
+		zonesUsed ? sl.getComputers() : Promise.resolve([])
+	]);
+	if (zonesUsed && !ids.every((id) => known.some((c) => String(c.ComputerID) === id))) throw new BookingError('error.unknownPc');
+	return quoteFor(account, existing, from, to, await stationZones(ids, known));
+}
+
+/** The requested PC IDs, de-duplicated, after the checks every booking and quote needs. */
+function checkedIds(computerIds: string[]): string[] {
+	const ids = [...new Set(computerIds.map((id) => id.trim()))];
+	if (ids.length === 0) throw new BookingError('error.noPcs');
+	if (ids.length > rules.maxStationsPerBooking) throw new BookingError('error.tooManyPcs', 400, { max: rules.maxStationsPerBooking });
+	if (!ids.every((id) => /^\d+$/.test(id))) throw new BookingError('error.invalidPcs');
+	return ids;
 }
 
 /** The customer's Smartlaunch account; 401 if it was deleted after they logged in. */
@@ -363,11 +383,11 @@ async function serverOrderCode(username: string, clientCode: string | undefined)
 	return Array.from(digest.slice(0, 12), (b) => alphabet[b % alphabet.length]).join('');
 }
 
-/** e.g. "Price EUR 9.50 (R7: 1 x campus EUR 3.50, 1 x rookie EUR 6.00)." for the booking description. */
+/** e.g. "Price EUR 9.50 (R7: 1 x campus EUR 3.50, 1 x rookie/vip EUR 6.00)." for the booking description. */
 export function describeQuote(quote: StationQuote): string {
-	const eur = (cents: number) => `${quote.currency} ${(cents / 100).toFixed(2)}`;
-	const lines = quote.lines.map((l) => `${l.stations} x ${l.plan} ${eur(l.each)}`).join(', ');
-	return `Price ${eur(quote.total)} (${quote.version}: ${lines}).`;
+	const amount = (cents: number) => `${quote.currency} ${(cents / 100).toFixed(2)}`;
+	const lines = quote.lines.map((l) => `${l.stations} x ${l.plan}${l.zone ? `/${l.zone}` : ''} ${amount(l.each)}`).join(', ');
+	return `Price ${amount(quote.total)} (${quote.version ? `${quote.version}: ` : ''}${lines}).`;
 }
 
 export function parseBookingRequest(input: unknown): BookingRequest {
@@ -400,18 +420,17 @@ export interface PreparedBooking {
 export async function prepareBooking(user: SessionUser, req: BookingRequest): Promise<PreparedBooking> {
 	const { from, to } = timeWindow(req.start, req.minutes);
 
-	// Bookings open from the next full hour in the center's time: at 14:20 the earliest start is 15:00.
-	if (CENTER_TIMEZONE) {
-		const earliest = Math.floor(nowInZone(CENTER_TIMEZONE) / 3600) * 3600 + 3600;
+	// Bookings open from the first start-grid time after now + lead time, in the center's
+	// time; with the defaults (60 and 0), at 14:20 the earliest start is 15:00.
+	if (center.center.timezone) {
+		const earliest = earliestStart(nowInZone(center.center.timezone));
 		if (from < earliest) {
-			throw new BookingError('error.tooEarly', 400, { time: formatLocal(earliest).slice(11) });
+			const at = formatLocal(earliest);
+			throw new BookingError('error.tooEarly', 400, { time: `${at.slice(0, 10)} ${at.slice(11)}` });
 		}
 	}
 
-	const ids = [...new Set(req.computerIds.map((id) => id.trim()))];
-	if (ids.length === 0) throw new BookingError('error.noPcs');
-	if (ids.length > MAX_PCS_PER_BOOKING) throw new BookingError('error.tooManyPcs', 400, { max: MAX_PCS_PER_BOOKING });
-	if (!ids.every((id) => /^\d+$/.test(id))) throw new BookingError('error.invalidPcs');
+	const ids = checkedIds(req.computerIds);
 
 	const orderCode = await serverOrderCode(user.username, req.orderCode);
 
@@ -422,8 +441,8 @@ export async function prepareBooking(user: SessionUser, req: BookingRequest): Pr
 		sl.getBookedComputerIds(toCompact(from), toCompact(to))
 	]);
 
-	if (existing.length >= MAX_UPCOMING_BOOKINGS) {
-		throw new BookingError('error.tooManyBookings', 409, { max: MAX_UPCOMING_BOOKINGS });
+	if (existing.length >= rules.maxUpcomingBookings) {
+		throw new BookingError('error.tooManyBookings', 409, { max: rules.maxUpcomingBookings });
 	}
 
 	const names = new Map(known.map((c) => [String(c.ComputerID), c.Name || `PC ${c.ComputerID}`]));
@@ -438,7 +457,7 @@ export async function prepareBooking(user: SessionUser, req: BookingRequest): Pr
 	}
 
 	// Priced on the server from the rules, never from an amount the browser sends.
-	const quote = await quoteFor(account, existing, from, to, ids.length);
+	const quote = await quoteFor(account, existing, from, to, await stationZones(ids, known));
 
 	const hours = req.minutes / 60;
 	const summary = `Online booking by ${user.username}: ${ids.length} PC(s) for ${Number.isInteger(hours) ? hours + ' h' : req.minutes + ' min'}.`;

@@ -15,7 +15,8 @@
 
 import type { BookingOrder, SessionUser, TopupOrder } from '#lib/types.js';
 import { formatLocal } from '#lib/time.js';
-import { PLAN_NAMES, type StationQuote } from '#lib/pricing.js';
+import type { StationQuote } from '#lib/pricing.js';
+import { center } from './center.js';
 import { db, nowSeconds } from './db.js';
 import { throttle } from './limits.js';
 import { BookingError, bookingFields, describeQuote, type PreparedBooking } from './booking.js';
@@ -56,18 +57,18 @@ const FAILED_FINAL_AFTER = 60 * 60;
 const PENDING_EXPIRES_AFTER = 24 * 60 * 60;
 const MAX_BACKOFF_SECONDS = 6 * 60 * 60;
 
-/** How long stations stay held for a customer who is paying for them. */
-export const BOOKING_HOLD_MINUTES = 15;
+/** How long stations stay held for a customer who is paying for them (payments.holdMinutes). */
+export const BOOKING_HOLD_MINUTES = center.payments.holdMinutes;
 /** Extra time after the hold before releasing it, for a payment completed at the last second. */
 const HOLD_GRACE_SECONDS = 2 * 60;
 /** After a hold is released, its checkout is still checked this long for a payment that slipped through. */
 const LATE_PAYMENT_SECONDS = 60 * 60;
 /** Bookings one customer may have waiting for payment at once. */
-const MAX_OPEN_HOLDS = 2;
+const MAX_OPEN_HOLDS = center.payments.maxOpenHolds;
 /** Holds a customer may let run out unpaid per hour before they have to wait. */
-const MAX_UNPAID_HOLDS_PER_HOUR = 4;
+const MAX_UNPAID_HOLDS_PER_HOUR = center.payments.maxUnpaidHoldsPerHour;
 /** Top-up checkouts one customer may start per hour. */
-const TOPUPS_PER_HOUR = 10;
+const TOPUPS_PER_HOUR = center.payments.topupsPerHour;
 
 const ORDER_ID_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
@@ -188,10 +189,6 @@ export async function startBookingPayment(
 	const provider = paymentProvider();
 	const quote = booking.quote;
 	if (!provider || !quote) throw new BookingError('topup.error.off', 404);
-	if (quote.currency !== paymentSettings.currency) {
-		console.error(`Prices are in ${quote.currency} but PAYMENT_CURRENCY is ${paymentSettings.currency}; bookings can't be paid.`);
-		throw new BookingError('topup.error.start', 500);
-	}
 	if (quote.total <= 0) throw new BookingError('topup.error.start', 500);
 
 	// Holding stations costs nothing until paid, so cap how many a customer can tie up.
@@ -407,7 +404,7 @@ export async function syncOrder(id: string): Promise<{ order: TopupOrder; provid
  * what the payment is for, as SumUp shows it to the customer and to staff.
  */
 function checkoutDescription(bookingId: string, orderId: string, start: string, stations: number, quote: StationQuote): string {
-	const plan = quote.lines[0] ? `, ${PLAN_NAMES[quote.lines[0].plan]}` : '';
+	const plan = quote.lines[0] ? `, ${quote.lines[0].planName}` : '';
 	const count = stations === 1 ? '1 station' : `${stations} stations`;
 	return `Booking #${bookingId}, ${start.replace('T', ' ')}, ${count}${plan}, order ${orderId}`;
 }

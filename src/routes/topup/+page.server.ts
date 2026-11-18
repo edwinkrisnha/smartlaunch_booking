@@ -1,8 +1,8 @@
 import { error, fail, redirect } from '@sveltejs/kit';
-import { CENTER_TIMEZONE } from '$app/env/private';
 import { translate } from '#lib/i18n/index.js';
 import { parseAmount } from '#lib/money.js';
 import { toHttpError } from '#lib/server/booking.js';
+import { center } from '#lib/server/center.js';
 import { createTopup, listTopups, syncOrder } from '#lib/server/orders.js';
 import { paymentProvider, paymentSettings } from '#lib/server/payments/index.js';
 import * as sl from '#lib/server/smartlaunch.js';
@@ -36,7 +36,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		min: paymentSettings.topupMin,
 		max: paymentSettings.topupMax,
 		// Server and browser must format dates alike; the center's zone is what customers expect.
-		timeZone: CENTER_TIMEZONE ?? 'UTC'
+		timeZone: center.center.timezone ?? 'UTC'
 	};
 };
 

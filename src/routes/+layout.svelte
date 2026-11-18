@@ -1,7 +1,6 @@
 <script lang="ts">
 	import '../app.css';
 	import { enhance } from '$app/forms';
-	import { PUBLIC_CENTER_NAME } from '$app/env/public';
 	import { page } from '$app/state';
 	import { LANGUAGE_NAMES, LOCALES, translator, type Locale } from '#lib/i18n/index.js';
 	import type { LayoutProps } from './$types';
@@ -19,7 +18,7 @@
 <svelte:head>
 	<link rel="stylesheet" href={data.theme.stylesheet} />
 	<link rel="icon" href={data.theme.favicon} />
-	<title>{t('meta.title', { center: PUBLIC_CENTER_NAME })}</title>
+	<title>{t('meta.title', { center: data.centerName })}</title>
 </svelte:head>
 
 <div class="app">
@@ -31,7 +30,7 @@
 		</form>
 	{/if}
 	<div class="bar">
-		<a class="brand" href="/"><span class="mark" aria-hidden="true"></span>{PUBLIC_CENTER_NAME}</a>
+		<a class="brand" href="/"><span class="mark" aria-hidden="true"></span>{data.centerName}</a>
 		{#if data.user}
 			<nav>
 				<a href="/" aria-current={page.url.pathname === '/' ? 'page' : undefined}>{t('nav.book')}</a>

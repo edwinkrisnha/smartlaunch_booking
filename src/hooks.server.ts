@@ -1,11 +1,11 @@
 import { json, redirect } from '@sveltejs/kit';
 import type { Handle } from '@sveltejs/kit/hooks';
-import { DEFAULT_LANGUAGE } from '$app/env/private';
 import { fromAcceptLanguage, isLocale, LOCALE_COOKIE, translate } from '#lib/i18n/index.js';
+import { center } from '#lib/server/center.js';
 import { readSession } from '#lib/server/session.js';
 
 const PUBLIC_PATHS = new Set(['/login', '/api/login', '/signup', '/api/signup', '/lang']);
-const FALLBACK_LOCALE = isLocale(DEFAULT_LANGUAGE) ? DEFAULT_LANGUAGE : 'en';
+const FALLBACK_LOCALE = isLocale(center.center.defaultLanguage) ? center.center.defaultLanguage : 'en';
 
 export const handle: Handle = async ({ event, resolve }) => {
 	event.locals.user = await readSession(event.cookies);

@@ -1,35 +1,47 @@
-import { PLAN_GROUPS, PRICE_RULES } from '$app/env/private';
-import { isPlan, type Plan } from '#lib/pricing.js';
+import { planForGroup, zoneOf } from '#lib/pricing.js';
+import { center } from './center';
 import * as sl from './smartlaunch';
 
-/**
- * Prices are shown and recorded only when the center has chosen a rule set.
- * "r6" still switches prices on after the move to R7, so an older setting
- * doesn't quietly make bookings free; it gets the current rules.
- */
-export const pricingEnabled = PRICE_RULES === 'r7' || PRICE_RULES === 'r6';
-
-if (PRICE_RULES && !pricingEnabled) console.error(`PRICE_RULES="${PRICE_RULES}" is not a known rule set; prices are off.`);
+/** The center's price list, or null when it shows no prices (no "pricing" in its config). */
+export const pricing = center.pricing;
+export const pricingEnabled = pricing !== null;
 
 const GROUP_CACHE_MS = 5 * 60_000;
-let groupCache: { at: number; names: Map<string, string> } | null = null;
 
-/** User group ID -> name. Groups rarely change, so keep them for a few minutes. */
-async function groupNames(): Promise<Map<string, string>> {
-	if (groupCache && Date.now() - groupCache.at < GROUP_CACHE_MS) return groupCache.names;
-	const groups = await sl.getUserGroups();
-	const names = new Map(groups.map((g) => [String(g.UserGroupID), g.UserGroupName ?? '']));
-	groupCache = { at: Date.now(), names };
-	return names;
+/** ID -> name of some kind of group, kept for a few minutes because groups rarely change. */
+function cachedNames(load: () => Promise<[string, string][]>): () => Promise<Map<string, string>> {
+	let cache: { at: number; names: Map<string, string> } | null = null;
+	return async () => {
+		if (cache && Date.now() - cache.at < GROUP_CACHE_MS) return cache.names;
+		const names = new Map(await load());
+		cache = { at: Date.now(), names };
+		return names;
+	};
+}
+
+const groupNames = cachedNames(async () => (await sl.getUserGroups()).map((g) => [String(g.UserGroupID), g.UserGroupName ?? '']));
+const computerGroupNames = cachedNames(async () => (await sl.getComputerGroups()).map((g) => [String(g.ComputerGroupID), g.Name ?? '']));
+
+/**
+ * The price zone (see pricing.zones) of each of `ids`, in the same order; null for
+ * a PC in no zone. Reads computer groups from the server only when zones use them.
+ */
+export async function stationZones(ids: string[], computers: sl.RawComputer[]): Promise<(string | null)[]> {
+	if (!pricing || pricing.zones.length === 0) return ids.map(() => null);
+	const groups = pricing.zones.some((z) => z.groups.length > 0) ? await computerGroupNames() : new Map<string, string>();
+	const byId = new Map(computers.map((c) => [String(c.ComputerID), c]));
+	return ids.map((id) => {
+		const c = byId.get(id);
+		const groupName = c ? (groups.get(String(c.ComputerGroupID)) ?? '') : '';
+		return zoneOf(pricing!, { id, name: c?.Name ?? '', groupName })?.id ?? null;
+	});
 }
 
 /**
- * The customer's price plan, from their Smartlaunch user group: PLAN_GROUPS
- * maps group names to plans, otherwise a group named like a plan gives that
- * plan. Everyone else, and anyone we can't look up, pays Rookie rates.
+ * The customer's price plan, from their Smartlaunch user group (see the plans'
+ * "groups" in the center config). Anyone else gets the default plan.
  */
-export async function planOf(account: sl.RawUser): Promise<Plan> {
-	const group = ((await groupNames()).get(String(account.UserGroupID)) ?? '').trim().toLowerCase();
-	const plan = PLAN_GROUPS.get(group) ?? group;
-	return isPlan(plan) ? plan : 'rookie';
+export async function planOf(account: sl.RawUser): Promise<string> {
+	if (!pricing) throw new Error('planOf: the center has no prices');
+	return planForGroup(pricing, (await groupNames()).get(String(account.UserGroupID)) ?? '');
 }

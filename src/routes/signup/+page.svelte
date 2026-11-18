@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { PUBLIC_CENTER_NAME } from '$app/env/public';
 	import { translator } from '#lib/i18n/index.js';
 	import { GENDERS } from '#lib/types.js';
 	import type { PageProps } from './$types';
@@ -67,7 +66,7 @@
 
 <section class="signup">
 	<div class="intro">
-		<p class="eyebrow">{PUBLIC_CENTER_NAME}</p>
+		<p class="eyebrow">{data.centerName}</p>
 		<h1>{t('signup.title')}<br /><span class="accent-text">{t('signup.titleAccent')}</span></h1>
 		<p class="muted">{t('signup.intro')}</p>
 		<div class="hazard" aria-hidden="true"></div>

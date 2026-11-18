@@ -1,9 +1,10 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { INTL_LOCALES, translator } from '#lib/i18n/index.js';
 	import { describeLocal, formatLocal } from '#lib/time.js';
 	import { formatMoney } from '#lib/money.js';
-	import { PLAN_NAMES, type Segment, type StationQuote } from '#lib/pricing.js';
+	import type { Segment, StationQuote } from '#lib/pricing.js';
 	import { placeSeats } from '#lib/seatmap.js';
 	import { UNPAID_ORDER_KEY } from '#lib/unpaid.js';
 	import type { PageProps } from './$types';
@@ -21,13 +22,20 @@
 	const PADDING = 16;
 	/** Shrink a wide room to fit its card, but not so far that PC names become unreadable. */
 	const MIN_ZOOM = 0.75;
-	const HOUR_OPTIONS = [1, 2, 3, 4, 5, 6, 8, 10, 12];
 
 	const pad = (n: number) => String(n).padStart(2, '0');
 	const toDateValue = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
-	// Bookings open from the next full hour: at 14:20 the earliest arrival is 15:00.
-	const nextFullHour = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours() + 1);
+	/**
+	 * Bookings open from the first start-grid time after now + the lead time (the center's
+	 * booking rules); with the defaults, at 14:20 the earliest arrival is 15:00.
+	 */
+	const earliestStart = (d: Date) => {
+		const { startGridMinutes: grid, leadMinutes } = data.form;
+		const minutes = d.getHours() * 60 + d.getMinutes() + leadMinutes;
+		return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, (Math.floor(minutes / grid) + 1) * grid);
+	};
+	const timeValue = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 
 	// Ticks so the limit moves on if the page stays open past the hour.
 	let now = $state(new Date());
@@ -35,18 +43,20 @@
 		const timer = setInterval(() => (now = new Date()), 30_000);
 		return () => clearInterval(timer);
 	});
-	const earliest = $derived(nextFullHour(now));
+	const earliest = $derived(earliestStart(now));
 	const earliestDate = $derived(toDateValue(earliest));
-	const earliestTime = $derived(`${pad(earliest.getHours())}:00`);
+	const earliestTime = $derived(timeValue(earliest));
+	const tomorrowDate = $derived(toDateValue(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)));
 
-	const initial = nextFullHour(new Date());
+	const initial = earliestStart(new Date());
 	let date = $state(toDateValue(initial));
-	let time = $state(`${pad(initial.getHours())}:00`);
-	let hours = $state(2);
+	let time = $state(timeValue(initial));
+	// The center's default duration, once; after that it is the customer's pick.
+	let hours = $state(untrack(() => data.form.defaultDuration));
 	let layoutId = $state('');
 
 	const start = $derived(`${date}T${time}`);
-	const minutes = $derived(hours * 60);
+	const minutes = $derived(Math.round(hours * 60));
 	const validInput = $derived(/^\d{4}-\d{2}-\d{2}$/.test(date) && /^\d{2}:\d{2}$/.test(time));
 	// `YYYY-MM-DDTHH:mm` without a zone parses as browser-local time, which is the center's time for its customers.
 	const tooEarly = $derived(validInput && new Date(start).getTime() < earliest.getTime());
@@ -142,8 +152,8 @@
 	$effect(() => {
 		const s = start;
 		const m = minutes;
-		const count = selected.size;
-		if (!data.pricing || !validInput || tooEarly || count === 0) {
+		const pcs = selectedIds;
+		if (!data.pricing || !validInput || tooEarly || pcs.length === 0) {
 			quote = null;
 			quoting = false;
 			quoteError = '';
@@ -156,7 +166,7 @@
 
 		const timer = setTimeout(async () => {
 			try {
-				const query = `start=${encodeURIComponent(s)}&minutes=${m}&stations=${count}`;
+				const query = `start=${encodeURIComponent(s)}&minutes=${m}&pcs=${pcs.join(';')}`;
 				const res = await fetch(`/api/quote?${query}`, { signal: controller.signal });
 				const body = (await res.json()) as ApiResponse<{ quote: StationQuote | null }>;
 				if (!res.ok || body.quote === undefined) throw new Error(body.error ?? t('book.priceFailed'));
@@ -316,7 +326,7 @@
 					<input
 						type="time"
 						bind:value={time}
-						step="900"
+						step={data.form.arrivalStepMinutes * 60}
 						min={date === earliestDate ? earliestTime : undefined}
 						required
 					/>
@@ -324,7 +334,7 @@
 				<label>
 					{t('book.duration')}
 					<select bind:value={hours}>
-						{#each HOUR_OPTIONS as h (h)}
+						{#each data.form.durations as h (h)}
 							<option value={h}>{t('book.hours', { n: h })}</option>
 						{/each}
 					</select>
@@ -334,7 +344,16 @@
 
 		{#if tooEarly}
 			<p class="notice error" role="alert">
-				{t(earliestDate === toDateValue(now) ? 'book.tooEarlyToday' : 'book.tooEarlyTomorrow', { time: earliestTime })}
+				{#if earliestDate === toDateValue(now)}
+					{t('book.tooEarlyToday', { time: earliestTime })}
+				{:else if earliestDate === tomorrowDate}
+					{t('book.tooEarlyTomorrow', { time: earliestTime })}
+				{:else}
+					{t('book.tooEarlyOn', {
+						time: earliestTime,
+						date: new Intl.DateTimeFormat(intlLocale, { weekday: 'short', day: 'numeric', month: 'short' }).format(earliest)
+					})}
+				{/if}
 			</p>
 		{:else if availabilityError}
 			<p class="notice error" role="alert">{availabilityError}</p>
@@ -407,19 +426,19 @@
 				<div class="price-detail">
 					{#if quote}
 						<ul>
-							{#each quote.lines as line (line.plan)}
+							{#each quote.lines as line (`${line.plan}/${line.zone ?? ''}`)}
 								<li>
 									<strong>
 										{quote.lines.length > 1 || line.stations > 1
-											? t('book.stationsAt', { n: line.stations, plan: PLAN_NAMES[line.plan], each: money(line.each, quote.currency) })
-											: t('book.planRate', { plan: PLAN_NAMES[line.plan] })}:
+											? t('book.stationsAt', { n: line.stations, plan: line.planName, each: money(line.each, quote.currency) })
+											: t('book.planRate', { plan: line.planName })}{line.zoneName ? ` · ${line.zoneName}` : ''}:
 									</strong>
 									{line.segments.map((seg) => describeSegment(seg, quote!.currency)).join(' · ')}
 								</li>
 							{/each}
 						</ul>
 						<p>
-							{#if quote.lines.length > 1}{t('book.planCoversOne')}{/if}
+							{#if quote.guestPlanName}{t('book.planCoversOne', { plan: quote.guestPlanName })}{/if}
 							{data.payOnline ? t('book.payNote', { minutes: data.holdMinutes }) : t('book.notChargedOnline')}
 						</p>
 					{:else}

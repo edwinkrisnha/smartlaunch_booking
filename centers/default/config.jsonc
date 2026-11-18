@@ -1,0 +1,123 @@
+// Settings for one center. Copy this folder to centers/<your-center>/, edit the
+// copy, and set CENTER=<your-center> on the deployment. Every setting is optional:
+// one you leave out gets the value shown here.
+//
+// Secrets and connection details are NOT in this file; they stay in environment
+// variables (SL_API_URL, SL_API_USERNAME, SL_API_PASSWORD, SESSION_SECRET,
+// PAYMENT_PROVIDER, SUMUP_*, TURNSTILE_*), see .env.example.
+//
+// Comments (// and /* */) and trailing commas are allowed. Amounts are in whole
+// currency units (2.5 = 2.50). Times are the center's local time, "HH:MM".
+// Days are "mon" ... "sun", or ranges such as "mon-fri".
+{
+	"center": {
+		// Shown in the page header and the browser tab.
+		"name": "Smartlaunch",
+		// IANA time zone of the center, e.g. "Europe/Berlin" or "Asia/Jakarta". With a zone set,
+		// the server rejects bookings that start before the earliest allowed time (see booking).
+		"timezone": null,
+		// ISO currency of prices and payments.
+		"currency": "EUR",
+		// Language for visitors whose browser asks for none of the supported ones: en, de or da.
+		"defaultLanguage": "en",
+		// Folder under src/themes that styles the site.
+		"theme": "default"
+	},
+
+	"booking": {
+		// Shortest and longest booking, in minutes.
+		"minMinutes": 30,
+		"maxMinutes": 1440,
+		// Durations customers can pick, in hours (0.5 = 30 minutes), and the one picked at first.
+		"durations": [1, 2, 3, 4, 5, 6, 8, 10, 12],
+		"defaultDuration": 2,
+		// Arrival times the time picker offers, every this many minutes.
+		"arrivalStepMinutes": 15,
+		// Earliest start: the first multiple of startGridMinutes after now + leadMinutes.
+		// 60 and 0 mean "from the next full hour": at 14:20 the earliest start is 15:00.
+		"startGridMinutes": 60,
+		"leadMinutes": 0,
+		// Most PCs in one booking, and most upcoming bookings one customer may have.
+		"maxStationsPerBooking": 50,
+		"maxUpcomingBookings": 10,
+		// PCs customers can never book online, by name or ID, e.g. ["PC29", "PC30"].
+		// They show as unavailable on the floor plan.
+		"excludedPcs": []
+	},
+
+	// Prices. null shows no prices on the site and turns off paying for bookings online.
+	"pricing": null,
+	/*
+	Example: a price list with a peak time and a members' plan.
+
+	"pricing": {
+		// Name of this price list; it is written into every booking it priced.
+		"version": "2026-1",
+
+		// Named time windows that rates can refer to.
+		"periods": {
+			"peak": [
+				{ "days": ["mon-fri"], "from": "17:00", "to": "22:00" },
+				{ "days": ["sat", "sun"], "from": "12:00", "to": "24:00" }
+			]
+		},
+
+		// Zones: PCs priced differently, e.g. a VIP room or consoles. A PC is in a zone when its
+		// Smartlaunch PC group is in "groups" or its name or ID is in "pcs"; in several zones,
+		// the first one listed wins. PCs in no zone get the plan's normal rate.
+		"zones": [
+			{ "id": "vip", "name": "VIP", "groups": ["VIP Room"] },
+			{ "id": "console", "name": "Console", "pcs": ["PS5-1", "PS5-2"] }
+		],
+
+		// Each plan has an hourly "rate", and optionally "rates" that override it at certain times.
+		// The first matching entry wins. An entry names a period, or gives days/from/to itself.
+		// A plan's "zones" give a zone its own "rate" and "rates"; a zone it doesn't list costs
+		// the plan's normal rate.
+		// Customers get a plan from their Smartlaunch user group: "groups" lists the group names;
+		// without "groups", a group named like the plan's id or name gives the plan.
+		"plans": [
+			{ "id": "standard", "name": "Standard", "rate": 5, "rates": [{ "period": "peak", "rate": 6 }],
+			  "zones": { "vip": { "rate": 8, "rates": [{ "period": "peak", "rate": 9 }] }, "console": { "rate": 4 } } },
+			{ "id": "member", "name": "Member", "groups": ["Members", "VIP"], "rate": 3,
+			  "rates": [{ "days": ["mon-fri"], "from": "10:00", "to": "14:00", "rate": 2 }],
+			  "zones": { "vip": { "rate": 6 } } }
+		],
+
+		// Plan for customers whose group gives no plan. Defaults to the first plan.
+		"defaultPlan": "standard",
+		// When one customer books several PCs, the extra PCs are charged at this plan
+		// (friends don't get the member's rate); the customer's own plan goes on the PC where
+		// it saves the most. null charges every PC at the customer's plan.
+		"guestPlan": null,
+		// true: a customer gets their plan rate on one booking at a time; a booking that
+		// overlaps another of theirs is charged at the default plan.
+		"oneDiscountAtATime": false,
+
+		// Whole rooms (priced by the engine, not offered on the site yet): rate per seat,
+		// room fee = capacity x seat rate; hours = durations a room can be booked for.
+		"rooms": []
+	},
+	*/
+
+	"payments": {
+		// Online top-ups (needs PAYMENT_PROVIDER): quick-pick amounts and the allowed range.
+		"topupAmounts": [10, 20, 50],
+		"topupMin": 5,
+		"topupMax": 200,
+		// How long PCs stay held while a customer pays for a booking.
+		"holdMinutes": 15,
+		// Bookings one customer may have waiting for payment at once, holds they may let
+		// run out unpaid per hour, and top-ups they may start per hour.
+		"maxOpenHolds": 2,
+		"maxUnpaidHoldsPerHour": 4,
+		"topupsPerHour": 10
+	},
+
+	"signup": {
+		// Whether visitors can create an account on the site.
+		"enabled": true,
+		// Youngest age allowed to sign up.
+		"minAge": 5
+	}
+}

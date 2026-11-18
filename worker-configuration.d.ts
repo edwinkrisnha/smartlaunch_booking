@@ -9,10 +9,7 @@ interface __BaseEnv_Env {
 	SL_API_PASSWORD: string;
 	SL_LICENSE_EMAIL: string;
 	SESSION_SECRET: string;
-	CENTER_TIMEZONE: string;
-	PUBLIC_CENTER_NAME: string;
-	PUBLIC_ALLOW_SIGNUP: string;
-	THEME: string;
+	CENTER: string;
 }
 declare namespace Cloudflare {
 	interface GlobalProps {
@@ -25,7 +22,7 @@ type StringifyValues<EnvType extends Record<string, unknown>> = {
 	[Binding in keyof EnvType]: EnvType[Binding] extends string ? EnvType[Binding] : string;
 };
 declare namespace NodeJS {
-	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "SL_API_URL" | "SL_API_USERNAME" | "SL_API_PASSWORD" | "SL_LICENSE_EMAIL" | "SESSION_SECRET" | "CENTER_TIMEZONE" | "PUBLIC_CENTER_NAME" | "PUBLIC_ALLOW_SIGNUP" | "THEME">> {}
+	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "SL_API_URL" | "SL_API_USERNAME" | "SL_API_PASSWORD" | "SL_LICENSE_EMAIL" | "SESSION_SECRET" | "CENTER">> {}
 }
 declare module "*.txt" {
 	const value: string;

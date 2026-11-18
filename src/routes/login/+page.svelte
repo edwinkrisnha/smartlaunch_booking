@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { PUBLIC_ALLOW_SIGNUP, PUBLIC_CENTER_NAME } from '$app/env/public';
 	import { translator } from '#lib/i18n/index.js';
 	import type { PageProps } from './$types';
 
@@ -12,7 +11,7 @@
 
 <section class="login">
 	<div class="intro">
-		<p class="eyebrow">{PUBLIC_CENTER_NAME}</p>
+		<p class="eyebrow">{data.centerName}</p>
 		<h1>{t('login.title')}<br /><span class="accent-text">{t('login.titleAccent')}</span></h1>
 		<p class="muted">{t('login.intro')}</p>
 		<div class="hazard" aria-hidden="true"></div>
@@ -44,7 +43,7 @@
 		<button class="primary" type="submit" disabled={submitting}>
 			{submitting ? t('login.submitting') : t('login.submit')}
 		</button>
-		{#if PUBLIC_ALLOW_SIGNUP}
+		{#if data.signupEnabled}
 			<p class="switch muted">{t('login.noAccount')} <a href="/signup">{t('login.createAccount')}</a></p>
 		{/if}
 	</form>

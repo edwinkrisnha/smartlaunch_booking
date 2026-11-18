@@ -1,9 +1,24 @@
 // Price engine checks: the arithmetic cases of the R6 acceptance tables (P, E and
-// R series), with the station rates of R7; room prices are unchanged since R6. Run with `npm test`. These prove the rules, not a live booking.
+// R series), with the station rates of R7; room prices are unchanged since R6. Run with `npm test`.
+// They price from centers/esportsnord/config.jsonc, so they prove that file states
+// the HUB's rules, not a live booking.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { quoteRoom, quoteStations, ROOMS, type Plan, type RoomId } from '../src/lib/pricing.ts';
+import { readFileSync } from 'node:fs';
+import { parseCenterConfig } from '../src/lib/config.ts';
+import { quoteRoom as quoteRoomWith, quoteStations as quoteStationsWith } from '../src/lib/pricing.ts';
+
+const file = new URL('../centers/esportsnord/config.jsonc', import.meta.url);
+const pricing = parseCenterConfig(readFileSync(file, 'utf8'), 'centers/esportsnord/config.jsonc').pricing!;
+
+type Plan = 'rookie' | 'campus' | 'pro' | 'alpha' | 'team';
+type RoomId = 'ROOM_PC10' | 'ROOM_PC12' | 'ROOM_CZ6' | 'ROOM_CON4';
+
+const quoteStations = (plan: Plan, from: number, to: number, stations: number, discountInUse = false) =>
+	quoteStationsWith(pricing, plan, from, to, stations, discountInUse);
+const quoteRoom = (id: RoomId, from: number, to: number, guests: number, catering: boolean) =>
+	quoteRoomWith(pricing, id, from, to, guests, catering);
 
 // A reference week: Monday 2 November 2026 to Sunday 8 November 2026.
 const MONDAY = Date.UTC(2026, 10, 2) / 1000;
@@ -143,7 +158,19 @@ test('R17-R22 room regressions', () => {
 
 test('room capacities', () => {
 	assert.deepEqual(
-		Object.values(ROOMS).map((r) => r.capacity),
+		pricing.rooms.map((r) => r.capacity),
 		[10, 12, 6, 4]
 	);
+});
+
+test('price list identity', () => {
+	assert.equal(pricing.version, 'R7');
+	assert.equal(pricing.currency, 'EUR');
+	assert.deepEqual(
+		pricing.plans.map((p) => p.name),
+		['Rookie', 'Campus', 'Pro', 'Alpha', 'TEAM']
+	);
+	// The guest line names the plan the friends pay.
+	assert.equal(quoteStations('alpha', at('Fri', '20:00'), at('Fri', '21:00'), 2).guestPlanName, 'Rookie');
+	assert.equal(quoteStations('alpha', at('Fri', '20:00'), at('Fri', '21:00'), 1).guestPlanName, null);
 });

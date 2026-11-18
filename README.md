@@ -49,12 +49,12 @@ Counters live in D1 (`migrations/0003_limits.sql`), so they hold across all Work
 | --- | --- |
 | Login | 30 tries per IP address and 10 wrong passwords per username, per 15 minutes |
 | Sign-up | 5 accounts per IP address per hour, plus the optional Turnstile check (`TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY`) |
-| Booking | 20 attempts per hour; at most 10 upcoming bookings; one request at a time per customer |
-| Paid booking holds | At most 2 waiting for payment; after 4 unpaid holds in an hour, wait an hour |
-| Top-up | 10 checkouts per hour |
+| Booking | 20 attempts per hour; at most 10 upcoming bookings (`booking.maxUpcomingBookings`); one request at a time per customer |
+| Paid booking holds | At most 2 waiting for payment (`payments.maxOpenHolds`); after 4 unpaid holds in an hour, wait an hour (`payments.maxUnpaidHoldsPerHour`) |
+| Top-up | 10 checkouts per hour (`payments.topupsPerHour`) |
 | Availability, prices, booking list | 120 requests per minute per customer |
 
-Change them with the constants in `booking.ts`, `orders.ts` and the API routes. Booking and top-up also check that the customer's Smartlaunch account still exists; if it was deleted, the session ends.
+The ones named in brackets are set in the [center config](#center-settings); the rest are constants in `booking.ts`, `orders.ts` and the API routes. Booking and top-up also check that the customer's Smartlaunch account still exists; if it was deleted, the session ends.
 
 The site sends a Content-Security-Policy (set in `vite.config.ts`), HSTS over https, `X-Frame-Options: DENY` and `nosniff`. A theme that loads fonts or images from anywhere other than Google Fonts needs that host added to the policy.
 
@@ -62,7 +62,7 @@ The site sends a Content-Security-Policy (set in `vite.config.ts`), HSTS over ht
 
 Customers top up their Smartlaunch balance on `/topup`: they pick an amount, pay on the provider's hosted payment page, and come back to `/topup/return`. Payments are off until `PAYMENT_PROVIDER` is set; the "Top up" link only shows when they're on.
 
-When booking prices are on as well (`PRICE_RULES`, see [Booking prices](#booking-prices)), **bookings must be paid online**. See [Paid bookings](#paid-bookings).
+When the center has booking prices as well (see [Booking prices](#booking-prices)), **bookings must be paid online**. See [Paid bookings](#paid-bookings).
 
 ### How an order flows
 
@@ -118,7 +118,7 @@ This needs a Smartlaunch server with `BookingStore`, which provides `/bookings/c
 ### SumUp
 
 1. In the SumUp Dashboard, go to *Developers* and create an **API key**, and note your **merchant code** (shown in your profile, e.g. `MH4H92C7`). For testing, create a sandbox merchant account and use its key.
-2. Set `PAYMENT_PROVIDER=sumup`, `SUMUP_API_KEY` (as a secret), `SUMUP_MERCHANT_CODE` and `PAYMENT_CURRENCY` (the currency of your SumUp account, e.g. `EUR` or `DKK`).
+2. Set `PAYMENT_PROVIDER=sumup`, `SUMUP_API_KEY` (as a secret) and `SUMUP_MERCHANT_CODE`, and make sure `center.currency` in the [center config](#center-settings) is the currency of your SumUp account (e.g. `EUR` or `DKK`).
 3. Deploy. Checkouts tell SumUp to send status webhooks to `https://<your site>/api/payments/webhook/sumup`; nothing needs to be registered in the dashboard. Webhooks are only sent when the site runs on `https`, so local runs rely on the return page and the scheduled job.
 
 SumUp's payment page is available for 30 minutes per checkout. A checkout that SumUp reports as failed can still be retried on that page, so the order is only marked `failed` after an hour; checkouts never paid are marked `expired` after a day.
@@ -133,11 +133,45 @@ Providers live in `src/lib/server/payments/`. To add one (Adyen, Stripe, Square,
 
 The order logic (`src/lib/server/orders.ts`), pages and database don't change. Webhooks arrive at `/api/payments/webhook/<name>`. They are only used as a hint to re-check the checkout, so providers without signed webhooks are fine. A provider that signs its webhooks can check the signature in `parseWebhook` as well. SvelteKit rejects cross-site POSTs that have no content type or a form content type, so a provider that posts webhooks that way needs a different route.
 
+## Center settings
+
+Everything a center customizes lives in one file, `centers/<name>/config.jsonc`, and the `CENTER` variable picks which folder a deployment uses (`default` if unset). One deployment serves one center, with its own database and its own config file. The file holds:
+
+| Section | What it sets |
+| --- | --- |
+| `center` | Name in the header, time zone, currency, default language, theme |
+| `booking` | Shortest and longest booking, the durations offered, arrival time step, earliest start (start grid and lead time), PCs per booking, upcoming bookings per customer, PCs excluded from online booking |
+| `pricing` | Price plans, their hourly rates and peak times, zones of PCs priced differently (e.g. VIP), which user group gives which plan, guest and one-discount rules, whole rooms; `null` for no prices |
+| `payments` | Top-up amounts and range, how long PCs stay held while a customer pays, hold and top-up limits |
+| `signup` | Whether visitors can create accounts, minimum age |
+
+`centers/default/config.jsonc` documents every setting with its default; a setting left out of a center's file gets that default. To set up a new center, copy `centers/default` to `centers/<your-center>`, edit the copy, and set `CENTER=<your-center>`. Credentials and connection details are not in the file; they stay in [environment variables](#configuration).
+
+The file is checked when the site starts. A typo in a setting name, a bad time or an unknown plan stops the site with a message listing every problem, rather than taking bookings with the wrong rules. `npm test` checks every center's file too, so run it before deploying. The config is bundled at build time, so a change needs a new build and deploy.
+
+Variables that used to hold these settings (`PUBLIC_CENTER_NAME`, `CENTER_TIMEZONE`, `DEFAULT_LANGUAGE`, `THEME`, `PAYMENT_CURRENCY`, `PUBLIC_ALLOW_SIGNUP`, `EXCLUDED_PCS`, `PRICE_RULES`, `PLAN_GROUPS`, `TOPUP_*`) are no longer read. If one is still set, the server logs where it now belongs in the config.
+
 ## Booking prices
 
-With `PRICE_RULES=r7` the booking page shows what the selected stations cost, and the price is written into the booking's description in Smartlaunch (e.g. `Price EUR 15.50 (R7: 1 x campus EUR 3.50, 1 x rookie EUR 12.00).`). If a payment provider is set up too, customers pay that price online to book (see [Paid bookings](#paid-bookings)). Without one, bookings are made unpaid and the page says nothing is charged online. With `PRICE_RULES` unset, no prices appear anywhere.
+When the center's config has a `pricing` section, the booking page shows what the selected stations cost, and the price is written into the booking's description in Smartlaunch (e.g. `Price EUR 15.50 (R7: 1 x campus EUR 3.50, 1 x rookie EUR 12.00).`). If a payment provider is set up too, customers pay that price online to book (see [Paid bookings](#paid-bookings)). Without one, bookings are made unpaid and the page says nothing is charged online. With `"pricing": null`, no prices appear anywhere.
 
-`r7` is the eSports Nord HUB price list, revision R7 (November 2026). `r6` is still accepted and gives the same R7 prices. All the rules live in `src/lib/pricing.ts`:
+A price list is made of:
+
+- **Periods:** named time windows, e.g. `"peak": [{ "days": ["mon-thu"], "from": "17:00", "to": "20:00" }, ...]`. A window can't run past midnight; split it in two.
+- **Plans:** each has an hourly `rate` and optional `rates` that override it during a period (or inline days and times). The first matching entry wins.
+- **Zones:** PCs priced differently, such as a VIP room or consoles. A zone lists Smartlaunch PC groups (`groups`) and/or PC names or IDs (`pcs`); a PC in several zones belongs to the first. A plan's `zones` give a zone its own `rate` and `rates`, e.g. `"zones": { "vip": { "rate": 8 } }`. A zone a plan doesn't list costs that plan's normal rate, and PCs in no zone always do. The price shown and written into the booking names the zone (`1 x rookie/vip EUR 8.00`).
+- **Which plan a customer gets:** from their Smartlaunch user group. A plan's `groups` lists the group names that give it; without `groups`, a group named like the plan's id or name (any case) does. Anyone else gets `defaultPlan`. To change a customer's plan, move them to another user group in the admin program.
+- **`guestPlan`:** extra stations in the same booking are for friends and cost this plan's rate. The customer's own rate goes on the station where it saves the most (so a member booking a normal and a VIP PC gets their rate on the VIP one). Without a guest plan, every station gets the customer's own rate.
+- **`oneDiscountAtATime`:** a customer who already has a booking at that time gets the default plan's rate for the new one.
+- **`version`:** the price list's name, written into each booking it priced. Change it when you change prices, so bookings show which prices they were made under.
+
+Prices are worked out the same way for every center:
+
+- **A booking is split wherever the rate changes**, and each station's price is rounded once to whole cents. Fri 16:30–17:30 at €5, or €6 from 17:00, is €2.50 + €3.00 = €5.50.
+- **The server always recalculates the price.** The browser never sends an amount.
+- **Whole-room prices are in the engine but not on the site yet.** `quoteRoom` prices the config's `rooms`: capacity × the room's seat rate over each segment, for the whole hours it allows, plus optional catering per guest.
+
+`centers/esportsnord/config.jsonc` is the eSports Nord HUB price list, revision R7 (November 2026):
 
 | Plan | Per station per hour (PC or console) |
 | --- | --- |
@@ -147,19 +181,13 @@ With `PRICE_RULES=r7` the booking page shows what the selected stations cost, an
 | Alpha | €1 at all times |
 | TEAM | €2 at all times (private use; included training is arranged by staff) |
 
-- **A booking is split wherever the rate changes**, and each station's price is rounded once to whole cents. Fri 16:30–17:30 at Rookie is €2.50 + €3.00 = €5.50.
-- **Where the plan comes from:** the customer's Smartlaunch user group. A group named `Campus`, `Pro`, `Alpha` or `TEAM` (any case) gives that plan. Use `PLAN_GROUPS` if your group names differ, e.g. `campus=Campus Members,pro=Pro`. Any other group gets Rookie. To change a customer's plan, move them to another user group in the admin program.
-- **The plan covers the customer's own station only.** Extra stations in the same booking are for friends and cost the Rookie rate. A customer who already has a booking at that time gets Rookie rates for the new one, because a member can't run two discounted sessions at once.
-- **The server always recalculates the price.** The browser never sends an amount.
-- **Whole-room prices are in the engine but not on the site yet.** `quoteRoom` covers MIXED ZONE 10, BATTLE ARENA 12, CONSOLE ZONE 6 and CINEMA LOUNGE 4: room capacity × €4 per seat per hour (€5 at peak, the R6 room prices), 2–6 whole hours, plus optional catering at €10 per guest.
+Extra stations cost the Rookie rate, and a member gets one discounted session at a time. The rooms (MIXED ZONE 10, BATTLE ARENA 12, CONSOLE ZONE 6, CINEMA LOUNGE 4) cost €4 per seat per hour (€5 at peak, the R6 room prices) for 2–6 whole hours, plus optional catering at €10 per guest.
 
-`npm test` checks the engine against the arithmetic cases of the R6 acceptance tables (P, E and R series), with the station prices updated to R7. It doesn't need a server.
-
-To change prices, edit `src/lib/pricing.ts`, update `PRICING_VERSION` and the tests, then rebuild. Bookings made earlier keep the price in their description.
+`npm test` prices the arithmetic cases of the R6 acceptance tables (P, E and R series, with the station prices updated to R7) from that file, so it proves the file states the HUB's rules. It doesn't need a server.
 
 ## Languages
 
-The site is available in English, German and Danish. Visitors switch with the flags in the header; the choice is kept in a `lang` cookie for a year. Without that cookie the site follows the browser's preferred languages, then `DEFAULT_LANGUAGE`, then English.
+The site is available in English, German and Danish. Visitors switch with the flags in the header; the choice is kept in a `lang` cookie for a year. Without that cookie the site follows the browser's preferred languages, then the center's `center.defaultLanguage`, then English.
 
 Error messages from the app's API (`/api/*`) come back in the same language.
 
@@ -167,7 +195,7 @@ All text lives in `src/lib/i18n/`: `en.ts` is the reference, and `de.ts` and `da
 
 ## Themes
 
-The site's look comes from a theme in `src/themes/<name>/`. Pick one with `THEME=<name>` in `.env` (or in the Worker's settings on Cloudflare). If `THEME` is unset or names a folder that doesn't exist, the `default` theme is used and the server logs a warning.
+The site's look comes from a theme in `src/themes/<name>/`. Pick one with `center.theme` in the [center config](#center-settings). If it names a folder that doesn't exist, the `default` theme is used and the server logs a warning.
 
 | Theme | Look |
 | --- | --- |
@@ -203,7 +231,7 @@ A theme folder contains:
    ```
 
 2. Optionally add `src/themes/mytheme/favicon.svg`.
-3. Set `THEME=mytheme` and rebuild. Themes are bundled at build time, so a new or changed theme needs a new build and deploy.
+3. Set `"theme": "mytheme"` in your center's config and rebuild. Themes are bundled at build time, so a new or changed theme needs a new build and deploy.
 
 To customise an existing theme, copy its folder under a new name and edit that, so updates to the original don't overwrite your changes.
 
@@ -211,27 +239,19 @@ The `esportsnord` theme uses Unbounded as a free stand-in for INTEGRAL CF. To us
 
 ## Configuration
 
+Environment variables hold only credentials, connection details and the choice of center. Prices, booking rules, top-up amounts and the center's name and look are in the [center config](#center-settings).
+
 | Variable | Secret? | Description |
 | --- | --- | --- |
 | `SL_API_URL` | no | Base URL of the REST API, e.g. `https://booking-api.example.com` |
 | `SL_API_USERNAME` | yes | `RESTBasicUsername`, or an employee login if `RESTUseEmployeeLoginAsSecurity` is on |
 | `SL_API_PASSWORD` | yes | Matching password |
 | `SESSION_SECRET` | yes | Random string of 32+ characters for signing session cookies |
-| `CENTER_TIMEZONE` | no | Optional IANA zone (e.g. `Asia/Jakarta`); rejects past start times server-side |
+| `CENTER` | no | Folder under `centers/` with this center's settings; defaults to `default` (see [Center settings](#center-settings)) |
 | `SL_LICENSE_EMAIL` | no | Optional; adds `?licenseemail=` for relay setups |
-| `PUBLIC_CENTER_NAME` | no | Name shown in the header |
-| `EXCLUDED_PCS` | no | PCs customers can't book online, by name or ID, separated by semicolons, e.g. `PC29;PC30`. They show as unavailable on the floor plan, and booking them is refused |
-| `PUBLIC_ALLOW_SIGNUP` | no | `false` hides `/signup` and turns off `/api/signup`; on by default |
-| `DEFAULT_LANGUAGE` | no | `en`, `de` or `da`, for visitors whose browser asks for none of them; defaults to `en` (see [Languages](#languages)) |
-| `PRICE_RULES` | no | `r7` shows booking prices from the eSports Nord R7 price list; empty shows none (see [Booking prices](#booking-prices)) |
-| `PLAN_GROUPS` | no | Optional mapping from price plans to Smartlaunch user groups, e.g. `campus=Campus Members,pro=Pro` |
-| `THEME` | no | Theme folder under `src/themes`; defaults to `default` (see [Themes](#themes)) |
 | `TURNSTILE_SITE_KEY` | no | Cloudflare Turnstile site key; with the secret below, sign-up asks visitors to prove they're not a robot |
 | `TURNSTILE_SECRET_KEY` | yes | Turnstile secret key |
-| `PAYMENT_PROVIDER` | no | `sumup` turns on online top-ups; empty turns them off (see [Payments](#payments)) |
-| `PAYMENT_CURRENCY` | no | Currency of the payment account, e.g. `EUR` or `DKK`; defaults to `EUR` |
-| `TOPUP_AMOUNTS` | no | Quick-pick amounts, e.g. `10,20,50` (the default) |
-| `TOPUP_MIN` / `TOPUP_MAX` | no | Smallest and largest amount a customer can enter; default 5 and 200 |
+| `PAYMENT_PROVIDER` | no | `sumup` turns on online payments; empty turns them off (see [Payments](#payments)) |
 | `SUMUP_API_KEY` | yes | SumUp secret API key |
 | `SUMUP_MERCHANT_CODE` | no | SumUp merchant code that receives the payments |
 | `SUMUP_API_URL` | no | Only for testing against a mock; defaults to `https://api.sumup.com` |
@@ -317,7 +337,7 @@ ddev exec npm test          # any npm script works through ddev exec
 | "The center server could not be reached" | `SL_API_URL` is wrong, the server is down, or a firewall blocks the port |
 | `SESSION_SECRET must be set…` in the console | `SESSION_SECRET` is missing or shorter than 32 characters |
 | Works locally, fails after deploy | `SL_API_URL` is a LAN or bare IP address; see *Reaching the center server from Cloudflare* |
-| "The payment could not be started" | `SUMUP_API_KEY` or `SUMUP_MERCHANT_CODE` is wrong, or `PAYMENT_CURRENCY` isn't your SumUp account's currency. The Worker logs show SumUp's answer. |
+| "The payment could not be started" | `SUMUP_API_KEY` or `SUMUP_MERCHANT_CODE` is wrong, or `center.currency` in the center config isn't your SumUp account's currency. The Worker logs show SumUp's answer. |
 | "Top up" link missing | `PAYMENT_PROVIDER` is empty, or its settings are incomplete (logged at startup) |
 | `The D1 database binding DB is missing` | `database_id` in `wrangler.jsonc` isn't set, or the migrations weren't applied |
 

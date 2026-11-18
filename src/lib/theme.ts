@@ -1,6 +1,6 @@
 // Themes live in src/themes/<name>/ with a theme.css and an optional
-// favicon.svg. They are bundled at build time; THEME picks one at runtime and
-// falls back to "default" when that folder does not exist.
+// favicon.svg. They are bundled at build time; the center config's center.theme
+// picks one and falls back to "default" when that folder does not exist.
 
 export const DEFAULT_THEME = 'default';
 

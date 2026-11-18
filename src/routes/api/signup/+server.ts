@@ -1,6 +1,6 @@
-import { PUBLIC_ALLOW_SIGNUP } from '$app/env/public';
 import { endpoint, readJson } from '#lib/server/api.js';
 import { BookingError, guardSignup, signup } from '#lib/server/booking.js';
+import { center } from '#lib/server/center.js';
 import { createSession } from '#lib/server/session.js';
 import type { RequestHandler } from './$types';
 
@@ -10,7 +10,7 @@ import type { RequestHandler } from './$types';
  * — creates the account (POST /users/create) and starts a session.
  */
 export const POST: RequestHandler = endpoint(async ({ request, cookies, getClientAddress }) => {
-	if (!PUBLIC_ALLOW_SIGNUP) throw new BookingError('signup.error.disabled', 404);
+	if (!center.signup.enabled) throw new BookingError('signup.error.disabled', 404);
 
 	const body = (await readJson(request)) as Record<string, unknown>;
 	const text = (key: string) => String(body[key] ?? '').trim();

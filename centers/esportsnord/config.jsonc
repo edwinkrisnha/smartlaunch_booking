@@ -1,0 +1,73 @@
+// eSports Nord HUB. Every setting is described in centers/default/config.jsonc;
+// anything left out here takes the default from there.
+{
+	"center": {
+		"name": "eSports Nord",
+		"timezone": "Europe/Berlin",
+		"currency": "EUR",
+		"defaultLanguage": "en",
+		"theme": "esportsnord"
+	},
+
+	"booking": {
+		"minMinutes": 30,
+		"maxMinutes": 1440,
+		"durations": [1, 2, 3, 4, 5, 6, 8, 10, 12],
+		"defaultDuration": 2,
+		"arrivalStepMinutes": 15,
+		"startGridMinutes": 60,
+		"leadMinutes": 0,
+		"maxStationsPerBooking": 50,
+		"maxUpcomingBookings": 10,
+		"excludedPcs": []
+	},
+
+	// HUB price list, revision R7 (November 2026). Amounts are EUR, gross, per hour.
+	"pricing": {
+		"version": "R7",
+
+		"periods": {
+			// Rookie (and whole-room) peak.
+			"peak": [
+				{ "days": ["mon-thu"], "from": "17:00", "to": "20:00" },
+				{ "days": ["fri"], "from": "17:00", "to": "22:00" },
+				{ "days": ["sat", "sun"], "from": "15:00", "to": "22:00" }
+			],
+			// Campus low-rate window. Campus never takes the peak surcharge; its own window wins (R13, R14).
+			"campus": [{ "days": ["mon-fri"], "from": "13:00", "to": "18:00" }]
+		},
+
+		"plans": [
+			{ "id": "rookie", "name": "Rookie", "rate": 5, "rates": [{ "period": "peak", "rate": 6 }] },
+			{ "id": "campus", "name": "Campus", "rate": 2.5, "rates": [{ "period": "campus", "rate": 1 }] },
+			{ "id": "pro", "name": "Pro", "rate": 2.5 },
+			{ "id": "alpha", "name": "Alpha", "rate": 1 },
+			// Private use outside agreed training. Included training is scheduled by staff, not booked here.
+			{ "id": "team", "name": "TEAM", "rate": 2 }
+		],
+
+		"defaultPlan": "rookie",
+		// A plan discount covers the customer's own station only (RATE-03); friends pay Rookie.
+		"guestPlan": "rookie",
+		// One discounted session per member at a time (RATE-03).
+		"oneDiscountAtATime": true,
+
+		// Whole rooms kept the R6 room price list (section 04). Not offered on the site yet.
+		"rooms": [
+			{ "id": "ROOM_PC10", "name": "MIXED ZONE 10", "capacity": 10, "hours": [2, 3, 4, 5, 6], "rate": 4, "rates": [{ "period": "peak", "rate": 5 }], "cateringPerGuest": 10 },
+			{ "id": "ROOM_PC12", "name": "BATTLE ARENA 12", "capacity": 12, "hours": [2, 3, 4, 5, 6], "rate": 4, "rates": [{ "period": "peak", "rate": 5 }], "cateringPerGuest": 10 },
+			{ "id": "ROOM_CZ6", "name": "CONSOLE ZONE 6", "capacity": 6, "hours": [2, 3, 4, 5, 6], "rate": 4, "rates": [{ "period": "peak", "rate": 5 }], "cateringPerGuest": 10 },
+			{ "id": "ROOM_CON4", "name": "CINEMA LOUNGE 4", "capacity": 4, "hours": [2, 3, 4, 5, 6], "rate": 4, "rates": [{ "period": "peak", "rate": 5 }], "cateringPerGuest": 10 }
+		]
+	},
+
+	"payments": {
+		"topupAmounts": [10, 20, 50],
+		"topupMin": 5,
+		"topupMax": 200
+	},
+
+	"signup": {
+		"enabled": true
+	}
+}

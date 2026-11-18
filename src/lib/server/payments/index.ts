@@ -1,16 +1,8 @@
 // Chooses the payment provider from PAYMENT_PROVIDER and its settings. To add a
 // provider, implement PaymentProvider (see provider.ts and sumup.ts) and add a case below.
 
-import {
-	PAYMENT_CURRENCY,
-	PAYMENT_PROVIDER,
-	SUMUP_API_KEY,
-	SUMUP_API_URL,
-	SUMUP_MERCHANT_CODE,
-	TOPUP_AMOUNTS,
-	TOPUP_MAX,
-	TOPUP_MIN
-} from '$app/env/private';
+import { PAYMENT_PROVIDER, SUMUP_API_KEY, SUMUP_API_URL, SUMUP_MERCHANT_CODE } from '$app/env/private';
+import { center } from '../center.js';
 import type { PaymentProvider } from './provider.js';
 import { sumup } from './sumup.js';
 
@@ -44,9 +36,10 @@ export function providerById(id: string): PaymentProvider | null {
 	return active && active.id === id ? active : null;
 }
 
+/** From the center config: prices and payments share the center's one currency. */
 export const paymentSettings = {
-	currency: PAYMENT_CURRENCY,
-	topupAmounts: TOPUP_AMOUNTS,
-	topupMin: TOPUP_MIN,
-	topupMax: TOPUP_MAX
+	currency: center.center.currency,
+	topupAmounts: center.payments.topupAmounts,
+	topupMin: center.payments.topupMin,
+	topupMax: center.payments.topupMax
 };
